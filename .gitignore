@@ -1,0 +1,27 @@
+# Python-generated files
+__pycache__/
+*.py[oc]
+build/
+dist/
+wheels/
+data/
+Dockerfile/
+models/
+
+*.egg-info
+
+# Virtual environments
+.venv
+.sl
+
+# Modèles lourds on commente si on passe en git LFS
+# *.h5
+# *.keras
+# *.pkl
+# *.csv
+
+# IDE
+*.vscode
+!.vscode/settings.json
+.env
+.streamlit/secrets.toml
