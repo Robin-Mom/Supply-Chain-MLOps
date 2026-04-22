@@ -136,6 +136,9 @@ créer l'aroborescence de dossier et les fichiers vide
 
 `touch src/collect.py src/process.py src/train.py src/inference.py requirement.txt .gitignore`
 
+## on ajoute des .gitkeep pour garder la structure des dossiers et assurer un clonage facile
+`for f in data models notebooks app tests Dockerfile; do touch $f/.gitkeep; done`
+
 Note Dockerfile
 
     The docker build command expects the file name to exactly be Dockerfile. So, in that case, you can simply do
@@ -216,5 +219,9 @@ et si on change d'avis ?? on peut refaire mais il faut d'abord un remove
 et non pas assez
 
 ## To push the current branch and set the remote as upstream, use we also need to force due to remote creation and to avoid an initial pull
-
     `git push --force --set-upstream origin main`
+
+
+Merci à Stéphane Robert pour ses innombrables tuyaux
+
+https://blog.stephane-robert.info/docs/conteneurs/images-conteneurs/optimiser-taille-image/

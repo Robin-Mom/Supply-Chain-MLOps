@@ -4,10 +4,10 @@ __pycache__/
 build/
 dist/
 wheels/
-data/
-Dockerfile/
-models/
-
+data/*
+!data/.gitkeep
+models/*
+!models/.gitkeep
 *.egg-info
 
 # Virtual environments
