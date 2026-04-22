@@ -180,10 +180,6 @@ data/
 
 `git init`
 
-## premier commit propre, staging (litéralement exposition sur la scène ou sortie de la coulisse) et commit
-`git add .`
-`git commit -m "Initial commit: Tabula Rasa (Clean start)"`
-
 ## Ajoutez votre URL remote (récupérez-la sur votre page GitHub)
 au passage example de Yohan https://github.com/DataScientest/exam_Bash_MLOps# 
 et rappel sur cookiecutter https://github.com/cookiecutter/cookiecutter
@@ -191,9 +187,34 @@ et rappel sur cookiecutter https://github.com/cookiecutter/cookiecutter
 ## créer le repo sur github avec `new`
 https://github.com/new
 
-## brancher le repo local au repo remote
-`git remote add origin https://github.com/schmilblick-ai/Supply-Chain-MLOps.git`
+## brancher le repo local au repo remote via http
+    `git remote add origin https://github.com/schmilblick-ai/Supply-Chain-MLOps.git`
+
+ou via ssh (avec ssh key defini dans votre home directory machine / user)
+
+    `git remote add origin git@github.com:schmilblick-ai/Supply-Chain-MLOps.git`
+
+et si on change d'avis ?? on peut refaire mais il faut d'abord un remove
+
+    `git remote remove origin`
+
 
 ## La taille du Repo à regarder de temps en temps
-`curl -s https://api.github.com/repos/USER/REPO | grep size`
-`curl -s https://api.github.com/repos/schmilblick-ai/Supply-Chain-MLOps | grep size`
+    `curl -s https://api.github.com/repos/USER/REPO | grep size`
+    `curl -s https://api.github.com/repos/schmilblick-ai/Supply-Chain-MLOps | grep size`
+
+## vérification du git remote
+    `git remote -v`
+
+## premier commit propre, staging (litéralement exposition sur la scène ou sortie de la coulisse) et commit
+    `git add .`
+    `git commit -m "Initial commit: Tabula Rasa (Clean start)"`
+
+## un premier push
+    `git push`
+
+et non pas assez
+
+## To push the current branch and set the remote as upstream, use we also need to force due to remote creation and to avoid an initial pull
+
+    `git push --force --set-upstream origin main`
