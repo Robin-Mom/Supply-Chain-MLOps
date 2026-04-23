@@ -12,7 +12,7 @@ models/*
 
 # Virtual environments
 .venv
-.sl
+.ml
 
 # Modèles lourds on commente si on passe en git LFS
 # *.h5
