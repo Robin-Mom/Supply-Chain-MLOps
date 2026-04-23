@@ -76,6 +76,10 @@ uv add --dev ipykernel
 uv run python -m ipykernel install --user --name my-project
 ```
 
+## Option C — Connecter le notebook au Kerner :
+Dans vscode, un click droit en haut à droite du notebook
+permet de branché le notebook au kernel
+
 Puis sélectionner le kernel my-project dans Jupyter.
 
 ## pyproject.toml minimal qui marche avec uv
@@ -118,5 +122,5 @@ En résumé
 | Lancer Jupyter | `jupyter notebook` | `uv run jupyter notebook` |
 | Vitesse | lente | 10-100x plus rapide |
 | Lock file | `requirements.txt` manuel | `uv.lock` automatique |
- 
+
 Le point clé : uv run jupyter notebook est la commande à retenir — elle garantit que le notebook voit exactement le même environnement que ton app.py.
