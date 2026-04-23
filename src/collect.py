@@ -64,4 +64,4 @@ def fetch_truspilot_reviews(site="www.oscaro.com",nb_pages=5):
 #fetch_truspilot_reviews(nb_pages=3)
 
 def fetch_truspilot_reviews1(site="www.oscaro.com",nb_pages=5):
-    return site,nb_pages
+    return nb_pages,site
