@@ -6,8 +6,6 @@ import time
 import random
 import subprocess
 import csv
-import json
-import time
 import logging
 import os
 
@@ -245,7 +243,7 @@ def fetch_truspilot_reviews4(site="www.oscaro.com",nb_pages=3, START_PAGE = 1):
         format="%(asctime)s [%(levelname)s] %(message)s",
         datefmt="%H:%M:%S",
     )
-    global log CURL_HEADERS, COOKIE_STRING, CSV_FILE, STATE_FILE
+    global log, CURL_HEADERS, COOKIE_STRING, CSV_FILE, STATE_FILE
 
     log = logging.getLogger(__name__)
 
@@ -387,5 +385,79 @@ def fetch_truspilot_reviews4(site="www.oscaro.com",nb_pages=3, START_PAGE = 1):
         total_new,
         CSV_FILE,
     )
+
+def Cookies2python(Cookie):
+    res={}
+    for u in Cookie.split("; "):
+        #print(u, u.split("=",1))
+        [key,val] = u.split("=",1)
+        #print(key,val)
+        res[key]=val
+    return res
+
+
+def testing():
+    from IPython.core.display import display, HTML
+       
+    #from copy past dev tool - changing frequently
+
+    Cookie="OptanonAlertBoxClosed=2026-01-06T08:59:54.335Z; jwt=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJjb25zdW1lcklkIjoiNjM3Yzk4Nzc0MjViZTMwMDEyNDc0ODllIiwiaGFzQWNjZXB0ZWRUZXJtcyI6dHJ1ZSwiaXNCbG9ja2VkRm9yUmVwb3J0aW5nIjpmYWxzZSwiYWNjZXNzVG9rZW4iOiJCVzF0cmVMYUltQm9CTHBjY2xDdm1COHRCNmdHIiwiYXV0aGVudGljYXRpb25Tb3VyY2UiOiJnb29nbGUiLCJpYXQiOjE3NzA0Mzk4NTksImV4cCI6MTc3ODIxNTg1OX0.mSSYeVlqklfPJidPFTDviljdAX0B7ziyu0n2PpCfEFs; _csrf=PiV8vIH9OBuWfdwWMfaxgfrC; _hjHasCachedUserAttributes=true; analytics_session_id=1776938089235; analytics_session_id.last_access=1776938437995; amplitude_idundefinedtrustpilot.com=eyJvcHRPdXQiOmZhbHNlLCJzZXNzaW9uSWQiOm51bGwsImxhc3RFdmVudFRpbWUiOm51bGwsImV2ZW50SWQiOjAsImlkZW50aWZ5SWQiOjAsInNlcXVlbmNlTnVtYmVyIjowfQ==; _twpid=tw.1776938656737.971232085262749810; _gcl_au=1.1.477835274.1776938657; _ga=GA1.1.1468068173.1776938657; _hjSessionUser_386931=eyJpZCI6IjhlZjkxN2FmLTFjNzAtNWI2NS04YTZhLWViNTNmNWMzNzUwMSIsImNyZWF0ZWQiOjE3NzY5Mzg2NTY5MTQsImV4aXN0aW5nIjp0cnVlfQ==; _uetsid=c9dade103efb11f1aac37795cc9017e6; _uetvid=c9daf2003efb11f1b51da7065201e49e; __adroll_fpc=37e02df7b0edda4923a33cc935ec4bcf-1776938657045; _fbp=fb.1.1776938657147.197246373384195974; amplitude_id_0401371089d1a27b189b1976accb81fftrustpilot.com=eyJkZXZpY2VJZCI6ImU0NDdiN2JkLTQ0MzktNGE0Yi1hYTUxLWE0NzZkODg0Mjk4ZCIsInVzZXJJZCI6bnVsbCwib3B0T3V0IjpmYWxzZSwic2Vzc2lvbklkIjoxNzc2OTM4NjU2NzE5LCJsYXN0RXZlbnRUaW1lIjoxNzc2OTM4NjU3NjY3LCJldmVudElkIjoyLCJpZGVudGlmeUlkIjoxLCJzZXF1ZW5jZU51bWJlciI6M30=; amplitude_id_cfe705a69359b8a4c0049d061ee5787btrustpilot.com=eyJkZXZpY2VJZCI6ImU4ZjhmZTIyLTY3NGYtNGYyMC05OTg1LWJkZmZmMzllODU1Y1IiLCJ1c2VySWQiOm51bGwsIm9wdE91dCI6ZmFsc2UsInNlc3Npb25JZCI6MTc3NjkzODYyMDc5NywibGFzdEV2ZW50VGltZSI6MTc3NjkzODcwNDI0MywiZXZlbnRJZCI6OSwiaWRlbnRpZnlJZCI6Miwic2VxdWVuY2VOdW1iZXIiOjExfQ==; TP.uuid=dc58e380-5468-461c-911a-5237c0b1b59a; ajs_anonymous_id=40936936-d108-491a-a9bc-ef2009f320d8; _hjSessionUser_391767=eyJpZCI6IjNjNTE1ODc2LTk1YzctNTI1NS05NjkzLWQ1OGRiOTc1NTdlYyIsImNyZWF0ZWQiOjE3NzY5NDE0MDkyOTQsImV4aXN0aW5nIjp0cnVlfQ==; _hjSession_391767=eyJpZCI6ImYwMzU4MzY3LTQ3NDItNDNhNi04ZDU4LWMxN2ViMjhkZThmZSIsImMiOjE3NzY5NTA4NzQyNDMsInMiOjAsInIiOjAsInNiIjowLCJzciI6MCwic2UiOjAsImZzIjowLCJzcCI6MH0=; tp-consumer-id=637c9877425be3001247489e; ajs_user_id=f8c8f01b18266574ee3aaba612727dcb3ec20b7a; OptanonConsent=isGpcEnabled=0&datestamp=Thu+Apr+23+2026+17%3A39%3A00+GMT%2B0200+(heure+d%E2%80%99%C3%A9t%C3%A9+d%E2%80%99Europe+centrale)&version=202603.1.0&browserGpcFlag=0&isIABGlobal=false&hosts=&consentId=09b25a6a-2e78-4d04-a04f-982f04328961&interactionCount=1&isAnonUser=1&landingPath=NotLandingPage&groups=C0001%3A1%2CC0002%3A1%2CC0003%3A1%2CC0004%3A1&intType=1&geolocation=FR%3BIDF&AwaitingReconsent=false&prevHadToken=0; _ga_11HBWMC274=GS2.1.s1776956838$o5$g1$t1776958741$j59$l0$h0; aws-waf-token=dd14f0c7-7184-4ed9-a2b6-1cb6d151ff5c:DAoAmDdsdlIrAAAA:tKoVz+hOwj1O9s0d/GPeCOU6fyq++ATLLZ4aR3wBz6KJNXlE/+xIYg+JDvTQwO/wREEgzSWZo+ofPV7u1n0+RIziNJTP34HBlvvhabg8KQmdq63EdDaus+V65VNEXLiXeOCjrYR6NyjM2cLrf3eOoWL9M/z9tD4wMWWCnPBh91kXOM6LOdnCtLDODpnjlT0bU+XpoiB3N3AEFZxuRF+gcxjngMd7R8OO6XatmeYOl8W28gUH8sdwQ3eG3YcaDcit0hSBJkzy824=; amplitude_id_67f7b7e6c8cb1b558b0c5bda2f747b07trustpilot.com=eyJkZXZpY2VJZCI6IjQwOTM2OTM2LWQxMDgtNDkxYS1hOWJjLWVmMjAwOWYzMjBkOCIsInVzZXJJZCI6ImY4YzhmMDFiMTgyNjY1NzRlZTNhYWJhNjEyNzI3ZGNiM2VjMjBiN2EiLCJvcHRPdXQiOmZhbHNlLCJzZXNzaW9uSWQiOjE3NzY5NTY4MzM0NjUsImxhc3RFdmVudFRpbWUiOjE3NzY5NTg3NDQ3MjYsImV2ZW50SWQiOjM0LCJpZGVudGlmeUlkIjo5LCJzZXF1ZW5jZU51bWJlciI6NDN9"
+    cookie="OptanonAlertBoxClosed=2026-01-06T08:59:54.335Z; jwt=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJjb25zdW1lcklkIjoiNjM3Yzk4Nzc0MjViZTMwMDEyNDc0ODllIiwiaGFzQWNjZXB0ZWRUZXJtcyI6dHJ1ZSwiaXNCbG9ja2VkRm9yUmVwb3J0aW5nIjpmYWxzZSwiYWNjZXNzVG9rZW4iOiJCVzF0cmVMYUltQm9CTHBjY2xDdm1COHRCNmdHIiwiYXV0aGVudGljYXRpb25Tb3VyY2UiOiJnb29nbGUiLCJpYXQiOjE3NzA0Mzk4NTksImV4cCI6MTc3ODIxNTg1OX0.mSSYeVlqklfPJidPFTDviljdAX0B7ziyu0n2PpCfEFs; _csrf=PiV8vIH9OBuWfdwWMfaxgfrC; _hjHasCachedUserAttributes=true; analytics_session_id=1776938089235; analytics_session_id.last_access=1776938437995; amplitude_idundefinedtrustpilot.com=eyJvcHRPdXQiOmZhbHNlLCJzZXNzaW9uSWQiOm51bGwsImxhc3RFdmVudFRpbWUiOm51bGwsImV2ZW50SWQiOjAsImlkZW50aWZ5SWQiOjAsInNlcXVlbmNlTnVtYmVyIjowfQ==; _twpid=tw.1776938656737.971232085262749810; _gcl_au=1.1.477835274.1776938657; _ga=GA1.1.1468068173.1776938657; _hjSessionUser_386931=eyJpZCI6IjhlZjkxN2FmLTFjNzAtNWI2NS04YTZhLWViNTNmNWMzNzUwMSIsImNyZWF0ZWQiOjE3NzY5Mzg2NTY5MTQsImV4aXN0aW5nIjp0cnVlfQ==; _uetsid=c9dade103efb11f1aac37795cc9017e6; _uetvid=c9daf2003efb11f1b51da7065201e49e; __adroll_fpc=37e02df7b0edda4923a33cc935ec4bcf-1776938657045; _fbp=fb.1.1776938657147.197246373384195974; amplitude_id_0401371089d1a27b189b1976accb81fftrustpilot.com=eyJkZXZpY2VJZCI6ImU0NDdiN2JkLTQ0MzktNGE0Yi1hYTUxLWE0NzZkODg0Mjk4ZCIsInVzZXJJZCI6bnVsbCwib3B0T3V0IjpmYWxzZSwic2Vzc2lvbklkIjoxNzc2OTM4NjU2NzE5LCJsYXN0RXZlbnRUaW1lIjoxNzc2OTM4NjU3NjY3LCJldmVudElkIjoyLCJpZGVudGlmeUlkIjoxLCJzZXF1ZW5jZU51bWJlciI6M30=; amplitude_id_cfe705a69359b8a4c0049d061ee5787btrustpilot.com=eyJkZXZpY2VJZCI6ImU4ZjhmZTIyLTY3NGYtNGYyMC05OTg1LWJkZmZmMzllODU1Y1IiLCJ1c2VySWQiOm51bGwsIm9wdE91dCI6ZmFsc2UsInNlc3Npb25JZCI6MTc3NjkzODYyMDc5NywibGFzdEV2ZW50VGltZSI6MTc3NjkzODcwNDI0MywiZXZlbnRJZCI6OSwiaWRlbnRpZnlJZCI6Miwic2VxdWVuY2VOdW1iZXIiOjExfQ==; TP.uuid=dc58e380-5468-461c-911a-5237c0b1b59a; ajs_anonymous_id=40936936-d108-491a-a9bc-ef2009f320d8; _hjSessionUser_391767=eyJpZCI6IjNjNTE1ODc2LTk1YzctNTI1NS05NjkzLWQ1OGRiOTc1NTdlYyIsImNyZWF0ZWQiOjE3NzY5NDE0MDkyOTQsImV4aXN0aW5nIjp0cnVlfQ==; _hjSession_391767=eyJpZCI6ImYwMzU4MzY3LTQ3NDItNDNhNi04ZDU4LWMxN2ViMjhkZThmZSIsImMiOjE3NzY5NTA4NzQyNDMsInMiOjAsInIiOjAsInNiIjowLCJzciI6MCwic2UiOjAsImZzIjowLCJzcCI6MH0=; tp-consumer-id=637c9877425be3001247489e; ajs_user_id=f8c8f01b18266574ee3aaba612727dcb3ec20b7a; OptanonConsent=isGpcEnabled=0&datestamp=Thu+Apr+23+2026+17%3A39%3A00+GMT%2B0200+(heure+d%E2%80%99%C3%A9t%C3%A9+d%E2%80%99Europe+centrale)&version=202603.1.0&browserGpcFlag=0&isIABGlobal=false&hosts=&consentId=09b25a6a-2e78-4d04-a04f-982f04328961&interactionCount=1&isAnonUser=1&landingPath=NotLandingPage&groups=C0001%3A1%2CC0002%3A1%2CC0003%3A1%2CC0004%3A1&intType=1&geolocation=FR%3BIDF&AwaitingReconsent=false&prevHadToken=0; _ga_11HBWMC274=GS2.1.s1776956838$o5$g1$t1776958741$j59$l0$h0; aws-waf-token=dd14f0c7-7184-4ed9-a2b6-1cb6d151ff5c:DAoAmDdsdlIrAAAA:tKoVz+hOwj1O9s0d/GPeCOU6fyq++ATLLZ4aR3wBz6KJNXlE/+xIYg+JDvTQwO/wREEgzSWZo+ofPV7u1n0+RIziNJTP34HBlvvhabg8KQmdq63EdDaus+V65VNEXLiXeOCjrYR6NyjM2cLrf3eOoWL9M/z9tD4wMWWCnPBh91kXOM6LOdnCtLDODpnjlT0bU+XpoiB3N3AEFZxuRF+gcxjngMd7R8OO6XatmeYOl8W28gUH8sdwQ3eG3YcaDcit0hSBJkzy824=; amplitude_id_67f7b7e6c8cb1b558b0c5bda2f747b07trustpilot.com=eyJkZXZpY2VJZCI6IjQwOTM2OTM2LWQxMDgtNDkxYS1hOWJjLWVmMjAwOWYzMjBkOCIsInVzZXJJZCI6ImY4YzhmMDFiMTgyNjY1NzRlZTNhYWJhNjEyNzI3ZGNiM2VjMjBiN2EiLCJvcHRPdXQiOmZhbHNlLCJzZXNzaW9uSWQiOjE3NzY5NTY4MzM0NjUsImxhc3RFdmVudFRpbWUiOjE3NzY5NTg3NDQ3MjYsImV2ZW50SWQiOjM0LCJpZGVudGlmeUlkIjo5LCJzZXF1ZW5jZU51bWJlciI6NDN9"
+    
+    
+    cookies = Cookies2python(Cookie)
+
+    headers = {
+        'accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.7',
+        'accept-language': 'fr-FR,fr;q=0.9,en-US;q=0.8,en;q=0.7',
+        'cache-control': 'max-age=0',
+        'priority': 'u=0, i',
+        'referer': 'https://fr.trustpilot.com/review/oscaro.com',
+        'sec-ch-ua': '"Google Chrome";v="147", "Not.A/Brand";v="8", "Chromium";v="147"',
+        'sec-ch-ua-mobile': '?0',
+        'sec-ch-ua-platform': '"Windows"',
+        'sec-fetch-dest': 'document',
+        'sec-fetch-mode': 'navigate',
+        'sec-fetch-site': 'same-origin',
+        'sec-fetch-user': '?1',
+        'upgrade-insecure-requests': '1',
+        'user-agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/147.0.0.0 Safari/537.36',
+        # 'cookie': 'OptanonAlertBoxClosed=2026-01-06T08:59:54.335Z; jwt=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJjb25zdW1lcklkIjoiNjM3Yzk4Nzc0MjViZTMwMDEyNDc0ODllIiwiaGFzQWNjZXB0ZWRUZXJtcyI6dHJ1ZSwiaXNCbG9ja2VkRm9yUmVwb3J0aW5nIjpmYWxzZSwiYWNjZXNzVG9rZW4iOiJCVzF0cmVMYUltQm9CTHBjY2xDdm1COHRCNmdHIiwiYXV0aGVudGljYXRpb25Tb3VyY2UiOiJnb29nbGUiLCJpYXQiOjE3NzA0Mzk4NTksImV4cCI6MTc3ODIxNTg1OX0.mSSYeVlqklfPJidPFTDviljdAX0B7ziyu0n2PpCfEFs; _csrf=PiV8vIH9OBuWfdwWMfaxgfrC; _hjHasCachedUserAttributes=true; analytics_session_id=1776938089235; analytics_session_id.last_access=1776938437995; amplitude_idundefinedtrustpilot.com=eyJvcHRPdXQiOmZhbHNlLCJzZXNzaW9uSWQiOm51bGwsImxhc3RFdmVudFRpbWUiOm51bGwsImV2ZW50SWQiOjAsImlkZW50aWZ5SWQiOjAsInNlcXVlbmNlTnVtYmVyIjowfQ==; _twpid=tw.1776938656737.971232085262749810; _gcl_au=1.1.477835274.1776938657; _ga=GA1.1.1468068173.1776938657; _hjSessionUser_386931=eyJpZCI6IjhlZjkxN2FmLTFjNzAtNWI2NS04YTZhLWViNTNmNWMzNzUwMSIsImNyZWF0ZWQiOjE3NzY5Mzg2NTY5MTQsImV4aXN0aW5nIjp0cnVlfQ==; _uetsid=c9dade103efb11f1aac37795cc9017e6; _uetvid=c9daf2003efb11f1b51da7065201e49e; __adroll_fpc=37e02df7b0edda4923a33cc935ec4bcf-1776938657045; _fbp=fb.1.1776938657147.197246373384195974; amplitude_id_0401371089d1a27b189b1976accb81fftrustpilot.com=eyJkZXZpY2VJZCI6ImU0NDdiN2JkLTQ0MzktNGE0Yi1hYTUxLWE0NzZkODg0Mjk4ZCIsInVzZXJJZCI6bnVsbCwib3B0T3V0IjpmYWxzZSwic2Vzc2lvbklkIjoxNzc2OTM4NjU2NzE5LCJsYXN0RXZlbnRUaW1lIjoxNzc2OTM4NjU3NjY3LCJldmVudElkIjoyLCJpZGVudGlmeUlkIjoxLCJzZXF1ZW5jZU51bWJlciI6M30=; amplitude_id_cfe705a69359b8a4c0049d061ee5787btrustpilot.com=eyJkZXZpY2VJZCI6ImU4ZjhmZTIyLTY3NGYtNGYyMC05OTg1LWJkZmZmMzllODU1Y1IiLCJ1c2VySWQiOm51bGwsIm9wdE91dCI6ZmFsc2UsInNlc3Npb25JZCI6MTc3NjkzODYyMDc5NywibGFzdEV2ZW50VGltZSI6MTc3NjkzODcwNDI0MywiZXZlbnRJZCI6OSwiaWRlbnRpZnlJZCI6Miwic2VxdWVuY2VOdW1iZXIiOjExfQ==; TP.uuid=dc58e380-5468-461c-911a-5237c0b1b59a; ajs_anonymous_id=40936936-d108-491a-a9bc-ef2009f320d8; _hjSessionUser_391767=eyJpZCI6IjNjNTE1ODc2LTk1YzctNTI1NS05NjkzLWQ1OGRiOTc1NTdlYyIsImNyZWF0ZWQiOjE3NzY5NDE0MDkyOTQsImV4aXN0aW5nIjp0cnVlfQ==; _hjSession_391767=eyJpZCI6ImYwMzU4MzY3LTQ3NDItNDNhNi04ZDU4LWMxN2ViMjhkZThmZSIsImMiOjE3NzY5NTA4NzQyNDMsInMiOjAsInIiOjAsInNiIjowLCJzciI6MCwic2UiOjAsImZzIjowLCJzcCI6MH0=; tp-consumer-id=637c9877425be3001247489e; ajs_user_id=f8c8f01b18266574ee3aaba612727dcb3ec20b7a; OptanonConsent=isGpcEnabled=0&datestamp=Thu+Apr+23+2026+17%3A19%3A41+GMT%2B0200+(heure+d%E2%80%99%C3%A9t%C3%A9+d%E2%80%99Europe+centrale)&version=202603.1.0&browserGpcFlag=0&isIABGlobal=false&hosts=&consentId=09b25a6a-2e78-4d04-a04f-982f04328961&interactionCount=1&isAnonUser=1&landingPath=NotLandingPage&groups=C0001%3A1%2CC0002%3A1%2CC0003%3A1%2CC0004%3A1&intType=1&geolocation=FR%3BIDF&AwaitingReconsent=false&prevHadToken=0; amplitude_id_67f7b7e6c8cb1b558b0c5bda2f747b07trustpilot.com=eyJkZXZpY2VJZCI6IjQwOTM2OTM2LWQxMDgtNDkxYS1hOWJjLWVmMjAwOWYzMjBkOCIsInVzZXJJZCI6ImY4YzhmMDFiMTgyNjY1NzRlZTNhYWJhNjEyNzI3ZGNiM2VjMjBiN2EiLCJvcHRPdXQiOmZhbHNlLCJzZXNzaW9uSWQiOjE3NzY5NTY4MzM0NjUsImxhc3RFdmVudFRpbWUiOjE3NzY5NTc1ODEyODYsImV2ZW50SWQiOjMwLCJpZGVudGlmeUlkIjo3LCJzZXF1ZW5jZU51bWJlciI6Mzd9; _ga_11HBWMC274=GS2.1.s1776956838$o5$g1$t1776958046$j60$l0$h0; aws-waf-token=dd14f0c7-7184-4ed9-a2b6-1cb6d151ff5c:DAoAoGdr3W0ZAAAA:yr/3fLb14ZrXmfxV8bNTmItDJcTS90ll3EuwQzaqcO/3/ZalhcJ31V5M3rBB8ADPHiOX+d9rxt87g48cxInWx09UMns9d5krjpVSR+HQHtC4oqbryeNX9DmBb9SlQVp8XK8uu/CTZMbzqDChGEK5OqQwMNcLRl5VMHb1WDV/fmfRRqydn8AUi2qoYm2jsxfFVRatgD46JzzJ6hZrNY2ZusemG58tAznSo49fn4ATkYa9sKw6O3TPUCwfizNjnDHYrVfS5zUVPbM=',
+    }
+
+    params = {
+        'page': '2',
+    }
+
+    response = requests.get('https://fr.trustpilot.com/review/oscaro.com', cookies=cookies, headers=headers)
+
+    #response = requests.get("https://fr.trustpilot.com/review/oscaro.com", headers=headers, cookies=cookies)
+
+    # 2. Extraire le buildId depuis __NEXT_DATA__
+
+    soup = BeautifulSoup(response.text, "html.parser")
+    display(HTML(soup))
+
+    found=soup.find("script", {"id": "__NEXT_DATA__"})
+    print(found)
+    try:
+        next_data = json.loads(found.string)
+
+        build_id = next_data["buildId"]
+        print(build_id)  # ex: businessunitprofile-consumersite-2.6055.0
+
+        # 3. Construire l'URL JSON proprement
+        json_url = f"https://fr.trustpilot.com/_next/data/{build_id}/review/oscaro.com.json?businessunit=oscaro.com"
+
+        # 4. Appeler l'API JSON directement
+        data = requests.get(json_url, headers=headers, cookies=cookies).json()
+        reviews = data["pageProps"]["reviews"]
+
+        for r in reviews:
+            print(r["consumer"]["displayName"], "⭐", r["rating"])
+            print(r["text"][:150])
+    except Exception as e:
+        print(f"💥An exception occurred:{e}")
+
 
 
