@@ -22,7 +22,15 @@ import numpy as np
 from bertopic import BERTopic
 from sentence_transformers import SentenceTransformer
 from sklearn.cluster import KMeans
+from sklearn.feature_extraction.text import CountVectorizer
+from bertopic.vectorizers import ClassTfidfTransformer
+from spacy.lang.fr.stop_words import STOP_WORDS
 import joblib
+
+### FUNCTIONS
+
+
+
 
 ### MAIN
 
@@ -105,15 +113,77 @@ def main(verbose, filepath, sep, colname, sentenceTransformer, n_clusters, model
 
 	# outliers (-1) → optionnel
 	df["meta_topic"] = df["meta_topic"].fillna(-1)
+	
+	log.info("MINIMAL LOGGING: Starting c-TF-IDF labeling for meta-clusters")
+	with open(log_output, "a", encoding="utf-8") as f:
+		f.write("MINIMAL LOGGING: Starting c-TF-IDF labeling for meta-clusters\n")
 
 	# -------------------------
-	# 7. Résultat final
+	# 7. Attribution des noms de clusters
 	# -------------------------
-	log.info(f"MINIMAL LOGGING: label and size of Meta-clusters:\n{df['meta_topic'].value_counts()}")
+	### functions
+	def extract_top_words_per_cluster(tfidf_matrix, feature_names, top_n=5):
+		labels = {}
+		for i in range(tfidf_matrix.shape[0]):
+			row = tfidf_matrix[i].toarray().flatten()
+			top_indices = row.argsort()[-top_n:][::-1]
+			labels[i] = [feature_names[j] for j in top_indices]
+		return labels
+
+	def format_label(meta_topic):
+		if meta_topic == -1 or meta_topic not in meta_labels:
+			return "outlier"
+		return " | ".join(meta_labels[meta_topic])
+	###
+	
+	# 7.1. Construction des "documents" par meta-cluster
+	meta_docs = (
+		df[df.meta_topic != -1]
+		.groupby("meta_topic")["doc"]
+		.apply(lambda docs: " ".join(docs))
+	)
+
+	# Sécurité : vérifier qu'on a des clusters
+	if len(meta_docs) == 0:
+		log.warning("No meta-clusters found for labeling")
+		meta_labels = {}
+	else:
+		# 7.2. Vectorizer adapté au français
+		french_stopwords = list(STOP_WORDS)
+		vectorizer = CountVectorizer(
+			stop_words=french_stopwords,
+			ngram_range=(1, 2),
+			min_df=5
+		)
+
+		X = vectorizer.fit_transform(meta_docs)
+
+		# 7.3. c-TF-IDF (implémentation officielle BERTopic)
+		ctfidf_model = ClassTfidfTransformer()
+		c_tf_idf = ctfidf_model.fit_transform(X)
+
+		feature_names = vectorizer.get_feature_names_out()
+
+		# 7.4. Extraction des top mots par meta-cluster
+		meta_labels = extract_top_words_per_cluster(
+			c_tf_idf, feature_names, top_n=5
+		)
+
+	# 7.5. Mapping meta_topic -> label texte
+	
+	df["meta_label"] = df["meta_topic"].apply(format_label)
+
+	log.info("MINIMAL LOGGING: Meta-cluster labeling complete")
 	with open(log_output, "a", encoding="utf-8") as f:
-		f.write(f"MINIMAL LOGGING: label and size of Meta-clusters:\n{df['meta_topic'].value_counts()}\n")
+		f.write("MINIMAL LOGGING: Meta-cluster labeling complete\n")
 	# -------------------------
-	# 8. Sauvegarde du modèle et de données labellisées
+	# 8. Résultat final
+	# -------------------------
+	log.info(f"MINIMAL LOGGING: label and size of Meta-clusters:\n{df['meta_label'].value_counts()}")
+	with open(log_output, "a", encoding="utf-8") as f:
+		f.write(f"MINIMAL LOGGING: label and size of Meta-clusters:\n{df['meta_label'].value_counts()}\n")
+	# -------------------------
+	# 9. Sauvegarde du modèle et de données labellisées
 	# -------------------------
 	log.info("Saving outputs")
 	with open(log_output, "a", encoding="utf-8") as f:
@@ -124,9 +194,6 @@ def main(verbose, filepath, sep, colname, sentenceTransformer, n_clusters, model
 	joblib.dump(topic_to_meta, model_output+"_topic_to_meta.pkl")
 	joblib.dump(embeddings, model_output+"_embeddings_"+sentenceTransformer+".pkl")
 	
-# "paraphrase-multilingual-mpnet-base-v2"
-# def main(verbose, filepath, sep, colname, sentenceTransformer, model_output, metrics_output):
-
 def _cli():
     parser = argparse.ArgumentParser(
             description=__doc__,

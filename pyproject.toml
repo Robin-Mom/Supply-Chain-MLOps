@@ -8,6 +8,7 @@ dependencies = [
     "bs4>=0.0.2",
     "pandas>=3.0.2",
     "requests>=2.33.1",
+    "spacy>=3.8.14",
 ]
 
 [dependency-groups]
