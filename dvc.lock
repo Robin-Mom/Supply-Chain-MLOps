@@ -1,0 +1,50 @@
+schema: '2.0'
+stages:
+  preprocess:
+    cmd: uv run src/preprocess.py
+    deps:
+    - path: data/avis_40k.csv
+      hash: md5
+      md5: a37a97783209add4600b46b82faeb88b
+      size: 21331918
+    - path: src/preprocess.py
+      hash: md5
+      md5: 51b052a672793a305255db9fe1be80dd
+      size: 2221
+    outs:
+    - path: data/avis_cleaned.csv
+      hash: md5
+      md5: f0ebb653f6335b8657c61547c1b23572
+      size: 20623543
+  nlp_simple:
+    cmd: uv run src/preprocess_nlp.py
+    deps:
+    - path: data/avis_cleaned.csv
+      hash: md5
+      md5: f0ebb653f6335b8657c61547c1b23572
+      size: 20623543
+    - path: src/preprocess_nlp.py
+      hash: md5
+      md5: ec367b95f91f02891a928bfd6ffee280
+      size: 2316
+    outs:
+    - path: data/avis_nlp.csv
+      hash: md5
+      md5: b36b8de537328709b48a33a2ef242bab
+      size: 24081047
+  spacy_lemmatization:
+    cmd: uv run src/preprocess_spacy.py
+    deps:
+    - path: data/avis_cleaned.csv
+      hash: md5
+      md5: f0ebb653f6335b8657c61547c1b23572
+      size: 20623543
+    - path: src/preprocess_spacy.py
+      hash: md5
+      md5: 79c7e70899933c6bfd2a34c4d3e8cae2
+      size: 2310
+    outs:
+    - path: data/avis_bertopic.csv
+      hash: md5
+      md5: d16f41a117ebfe4d04827797dec696ac
+      size: 23715509
