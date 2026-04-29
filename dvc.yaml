@@ -1,0 +1,15 @@
+stages:
+  preprocess:
+    cmd: uv run src/preprocess.py
+    deps:
+      - src/preprocess.py
+      - data/avis_40k.csv
+    outs:
+      - data/avis_cleaned.csv
+  nlp:
+    cmd: uv run src/preprocess_nlp.py
+    deps:
+      - src/preprocess_nlp.py
+      - data/avis_cleaned.csv
+    outs:
+      - data/avis_nlp.csv
