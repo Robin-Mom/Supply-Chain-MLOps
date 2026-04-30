@@ -21,6 +21,7 @@ import pandas as pd
 import numpy as np
 import ast
 import json
+import os
 from sklearn.metrics import silhouette_score
 
 ### MAIN
@@ -32,6 +33,8 @@ def main(verbose, filepath, sep, col_topics, col_embs, metrics_output, log_outpu
 	# -------------------------
 	log.info(f"loading clusterized data {filepath}")
 	df = pd.read_csv(filepath)
+	logdir = os.path.dirname(log_output)
+	os.makedirs(logdir, exist_ok=True)
 	with open(log_output, "w", encoding="utf-8") as f:
 		f.write(f"loading clusterized data {filepath}")
 	# -------------------------
@@ -59,7 +62,8 @@ def main(verbose, filepath, sep, col_topics, col_embs, metrics_output, log_outpu
 		metrics = {
 			"silhouette_score": float(score)  # conversion importante (numpy -> float)
 		}
-
+		metricsdir = os.path.dirname(metrics_output)
+		os.makedirs(metricsdir, exist_ok=True)
 		with open(metrics_output, "w", encoding="utf-8") as f:
 			json.dump(metrics, f, indent=4)
 
