@@ -18,6 +18,7 @@ import argparse
 import logging as log # module standard pour la gestion des messages de diagnostic.
 import pandas as pd
 import numpy as np
+import os
 
 from bertopic import BERTopic
 from sentence_transformers import SentenceTransformer
@@ -40,6 +41,8 @@ def main(verbose, filepath, sep, colname, sentenceTransformer, n_clusters, model
 	# 1. Données
 	# -------------------------
 	log.info(f"MINIMAL LOGGING: Loading processed data: {filepath}")
+	logdir = os.path.dirname(log_output)
+	os.makedirs(logdir, exist_ok=True)
 	with open(log_output, "w", encoding="utf-8") as f:
 		f.write(f"MINIMAL LOGGING: Loading processed data: {filepath}\n")
 	df_processed = pd.read_csv(filepath, sep=sep)
@@ -188,6 +191,10 @@ def main(verbose, filepath, sep, colname, sentenceTransformer, n_clusters, model
 	log.info("Saving outputs")
 	with open(log_output, "a", encoding="utf-8") as f:
 		f.write("Saving outputs\n")
+	datadir = os.path.dirname(data_output)
+	os.makedirs(datadir, exist_ok=True)
+	modeldir = os.path.dirname(model_output)
+	os.makedirs(modeldir, exist_ok=True)
 	df.to_csv(data_output)
 	topic_model.save(model_output)
 	joblib.dump(kmeans, model_output+"_kmeans.pkl")
