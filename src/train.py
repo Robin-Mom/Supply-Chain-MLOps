@@ -56,7 +56,7 @@ def main(verbose, filepath, sep, colname, sentenceTransformer, n_clusters, model
 	log.info(f"MINIMAL LOGGING: Starting embeddings with {sentenceTransformer}")
 	with open(log_output, "a", encoding="utf-8") as f:
 		f.write(f"MINIMAL LOGGING: Starting embeddings with {sentenceTransformer}\n")
-	embedding_model = SentenceTransformer(sentenceTransformer, device="cuda")
+	embedding_model = SentenceTransformer(sentenceTransformer) # si l'infrastructure a des gpu et un driver nvidia récent: ajouter l'option device="cuda" 
 	embeddings = embedding_model.encode(documents, batch_size=64, show_progress_bar=True)
 	log.info("MINIMAL LOGGING: embeddings complete")
 	with open(log_output, "a", encoding="utf-8") as f:
