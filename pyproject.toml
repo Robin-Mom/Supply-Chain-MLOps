@@ -7,7 +7,7 @@ requires-python = ">=3.12"
 dependencies = [
     "bs4>=0.0.2",
     "dagshub>=0.7.0",
-    "dvc>=3.67.1",
+    "dvc[s3]>=3.67.1",
     "matplotlib>=3.10.9",
     "nltk>=3.9.4",
     "numpy>=2.4.4",
