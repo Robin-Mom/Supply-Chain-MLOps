@@ -4,24 +4,31 @@ __pycache__/
 build/
 dist/
 wheels/
-#data/*
-!data/.gitkeep
-models/*
-!models/.gitkeep
 *.egg-info
 
 # Virtual environments
 .venv
 .ml
 
-# Modèles lourds on commente si on passe en git LFS
-# *.h5
-# *.keras
-# *.pkl
-# *.csv
+# --- CONFIGURATION DATA (GIT + DVC) ---
+# On ignore le contenu du dossier data
+data/*
+# Sauf les fichiers de configuration et de tracking DVC
+!data/.gitkeep
+!data/*.dvc
+!data/.gitignore
 
-# IDE
-*.vscode
+# --- CONFIGURATION MODELS ---
+models/*
+!models/.gitkeep
+# Si tu utilises DVC pour les modèles aussi :
+!models/*.dvc
+
+# IDE & Config
+.vscode/
 !.vscode/settings.json
 .env
 .streamlit/secrets.toml
+
+# Logs du pipeline (On ne les push pas sur Git)
+logs/

@@ -1,0 +1,24 @@
+stages:
+  preprocess:
+    cmd: uv run src/preprocess.py
+    deps:
+      - src/preprocess.py
+      - data/avis_40k.csv
+    outs:
+      - data/avis_cleaned.csv
+
+  nlp_simple:
+    cmd: uv run src/preprocess_nlp.py
+    deps:
+      - src/preprocess_nlp.py
+      - data/avis_cleaned.csv
+    outs:
+      - data/avis_nlp.csv
+
+  spacy_lemmatization:
+    cmd: uv run src/preprocess_spacy.py
+    deps:
+      - src/preprocess_spacy.py
+      - data/avis_cleaned.csv
+    outs:
+      - data/avis_bertopic.csv
