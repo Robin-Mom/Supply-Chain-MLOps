@@ -1,6 +1,6 @@
 [core]
-    analytics = false
     remote = origin
+    analytics = false
 [cache]
     type = symlink
 ['remote "origin"']
