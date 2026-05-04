@@ -460,4 +460,139 @@ def testing():
         print(f"💥An exception occurred:{e}")
 
 
+######################################################################
+####### only preparing local data fetch with proper calendar
+
+
+import pandas as pd
+from pathlib import Path
+import csv
+import datetime as dt
+import yaml
+
+def get_calendar():
+    #this calendar is providing date with hours depending on the time we run the function - so bad
+    #calendar = pd.DataFrame({"date":[datetime.now() - timedelta(days=p-3650) for p in range(19800)]})
+    # we compute the delta + we project to first 0:00 of the day
+    Today=dt.datetime.combine(dt.datetime.today(), dt.datetime.min.time())
+
+    calendar = pd.DataFrame({"date":[Today - dt.timedelta(days=p-3650) for p in range(19800)]})
+    calendar["Period"] ='P'+calendar['date'].dt.isocalendar().year.astype(str) + \
+        calendar['date'].dt.isocalendar().week.astype(str).str.zfill(2)   
+    return calendar
+
+calend= get_calendar()
+#various ways to query a calendar
+lst53s=calend[ calend.Period.str.endswith("53") ]
+#from day to day get the periods
+
+def get_periods(StartDay=None,EndDay=None,NbPer=None):
+    #logic d'usage
+    #début fin
+    #début + N
+    #fin - N
+    #"1998-01-01","1998-12-31"
+    calend=get_calendar()
+
+    if NbPer != None:        
+        NbDays=dt.timedelta(days=7*(NbPer-1))
+        if StartDay == None:
+            StartDay=dt.datetime.strptime(EndDay, '%Y-%m-%d')-NbDays 
+        if EndDay == None:
+            EndDay=dt.datetime.strptime(StartDay, '%Y-%m-%d')-NbDays 
+    else:
+        if StartDay == None or EndDay == None:
+            raise "inconsistent settings"
+    lstPer=calend[ calend.date.between(StartDay,EndDay) ].Period.sort_values(axis=0).unique()
+    #lstPer=calend[ calend.date.between("1998-01-01","1998-12-31") ].Period.sort_values(axis=0).unique()
+    return lstPer
+
+#ASSEMBLAGE AVIS UNIQUE
+def get_avis(avisSrc):
+    avisF = Path(f"../data/{avisSrc}.csv")
+    if avisF.exists():
+        return pd.read_csv(avisF,sep=";")
+
+def merge_avis(set1="avis_40k",set2="avis_28k", tgtset="avis_45k"):
+    df=pd.concat([get_avis(set1),get_avis(set2)])
+
+    nodupkeys=["auteur","note","titre","commentaire","date_experience","texteServiceReply","dateServiceReply","dataServiceReply"]
+    df = df.drop(columns=["url"])
+    df = df.sort_values(by=nodupkeys)
+    df = df.drop_duplicates(subset=nodupkeys)
+    #display(df.head())
+
+    df.info(memory_usage="deep")
+    tgtAvis=Path(f"../data/{tgtset}.csv")
+    df.to_csv(tgtAvis, index=None,sep=";",quoting=csv.QUOTE_ALL)
+
+def get_reviews(reviewSrc="avis_45k", arrPeriods=[], mode="bulk"):
+    """ fonction API de review 
+    fournit le jeux de review disponible par filtre par periode
+    on fournit deux périodes
+    
+    mode peut prendre les valeurs "bulk" on "incremental"
+
+    cela détermine uniquement le jeux du csv de sortie
+    -d collect.py
+    -P params.yaml
+    -o data/reviews.csv 
+    -o data/reviews_inc.csv
+    python collect.py
+    """
+
+    df=get_avis(reviewSrc)
+
+    df['date_experience']  = pd.to_datetime(df['date_experience'], errors='coerce')
+    df['date_avis']        = pd.to_datetime(df['date_avis'], errors='coerce')
+    df['dateServiceReply'] = pd.to_datetime(df['dateServiceReply'], errors='coerce')
+
+    df['Period']= 'P'+df['date_experience'].dt.isocalendar().year.astype(str) + \
+        df['date_experience'].dt.isocalendar().week.astype(str).str.zfill(2)
+
+    df['YearMonth_experience']  = df['date_experience'].dt.to_period('M')
+    df['YearMonth_avis']        = df['date_avis'].dt.to_period('M')
+    df['YearMonthServiceReply'] = df['dateServiceReply'].dt.to_period('M')
+    if len(arrPeriods) == 0:
+        return df
+    else:
+        if len(arrPeriods) <= 2:
+            return df[ df.Period.between(arrPeriods[0],arrPeriods[-1]) ]
+        else:
+            return df[ df.Period.isin(arrPeriods) ]
+        
+#main section for dvc runs with the params.yaml
+if __name__ == "__main__":
+
+    #from params.yaml
+    
+    with open("params.yaml") as f:
+        params = yaml.safe_load(f)
+
+    mode = params["collect"]["mode"]
+    source = params["collect"]["source"]
+    period_start = params["collect"]["period_start"]
+    period_end = params["collect"]["period_end"]
+
+    # collecte le batch demandé
+    df_new = get_reviews(reviewSrc=source,period=[period_start, period_end], mode=mode)
+
+    if mode == "incremental":
+        # append sur le fichier existant
+        if os.path.exists("data/raw/reviews.csv"):
+            df_existing = pd.read_csv("data/raw/reviews.csv")
+            df = pd.concat([df_existing, df_new]).drop_duplicates()
+        else:
+            df = df_new
+        df.to_csv("data/raw/reviews.csv", index=False)
+
+    elif mode == "full":
+        # écrase tout
+        df = df_new
+        df.to_csv("data/raw/reviews.csv", index=False)
+
+    elif mode == "predict":
+        # on prépare un batch de données pour la prédiction
+        df = df_new
+        df.to_csv("data/raw/reviews2predict.csv", index=False)
 
