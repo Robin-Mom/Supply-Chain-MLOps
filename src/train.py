@@ -35,7 +35,7 @@ import joblib
 
 ### MAIN
 
-def main(verbose, filepath, sep, colname, sentenceTransformer, n_clusters, model_output, data_output, log_output):
+def main(verbose, filepath, sep, colname, sentenceTransformer, n_clusters, model_output, data_output, log_output, gpu_accel):
 
 	# -------------------------
 	# 1. Données
@@ -56,7 +56,12 @@ def main(verbose, filepath, sep, colname, sentenceTransformer, n_clusters, model
 	log.info(f"MINIMAL LOGGING: Starting embeddings with {sentenceTransformer}")
 	with open(log_output, "a", encoding="utf-8") as f:
 		f.write(f"MINIMAL LOGGING: Starting embeddings with {sentenceTransformer}\n")
-	embedding_model = SentenceTransformer(sentenceTransformer) # si l'infrastructure a des gpu et un driver nvidia récent: ajouter l'option device="cuda" 
+	device = ""  # gpu accelleration or not
+	if gpu_accel:
+		device="cuda"
+	else:
+		device="cpu"
+	embedding_model = SentenceTransformer(sentenceTransformer, device=device) 
 	embeddings = embedding_model.encode(documents, batch_size=64, show_progress_bar=True)
 	log.info("MINIMAL LOGGING: embeddings complete")
 	with open(log_output, "a", encoding="utf-8") as f:
@@ -199,6 +204,7 @@ def main(verbose, filepath, sep, colname, sentenceTransformer, n_clusters, model
 	topic_model.save(model_output)
 	joblib.dump(kmeans, model_output+"_kmeans.pkl")
 	joblib.dump(topic_to_meta, model_output+"_topic_to_meta.pkl")
+	joblib.dump(meta_labels, model_output + "_meta_labels.pkl")
 	joblib.dump(embeddings, model_output+"_embeddings_"+sentenceTransformer+".pkl")
 	
 def _cli():
@@ -215,6 +221,7 @@ def _cli():
     parser.add_argument('-mo', '--model_output', default="models/BERTopic", type=str, help="Name of output file for model.")
     parser.add_argument('-do', '--data_output', default="data/clusterized.csv", type=str, help="Name of output file for clusterized data.")
     parser.add_argument('-lo', '--log_output', default="models/minimal.log", type=str, help="Name of output file for minimal logs.")
+    parser.add_argument('-gpu', '--gpu_accel', action='store_true', default=False, help="Boolean: Activate gpu acceleration; requires recent nvidia drivers. Default is False")    
         
     args = parser.parse_args()
     
