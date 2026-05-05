@@ -27,15 +27,20 @@ from sklearn.feature_extraction.text import CountVectorizer
 from bertopic.vectorizers import ClassTfidfTransformer
 from spacy.lang.fr.stop_words import STOP_WORDS
 import joblib
-
-### FUNCTIONS
-
-
-
+import mlflow
 
 ### MAIN
 
 def main(verbose, filepath, sep, colname, sentenceTransformer, n_clusters, model_output, data_output, log_output, gpu_accel):
+
+
+### @@@ MLflow @@@ Set tracking experiment
+	mlflow.set_tracking_uri("http://127.0.0.1:8080")
+
+### @@@ MLflow @@@ Define experiment name, run name and artifact_path name
+	trustpilot_experiment = mlflow.set_experiment("Trustpilot_Bertopic")
+	run_name = "first_run"
+	artifact_path = "bert_paraphrase_mpnetv2_trustpilot"
 
 	# -------------------------
 	# 1. Données
@@ -200,12 +205,32 @@ def main(verbose, filepath, sep, colname, sentenceTransformer, n_clusters, model
 	os.makedirs(datadir, exist_ok=True)
 	modeldir = os.path.dirname(model_output)
 	os.makedirs(modeldir, exist_ok=True)
+	bundle_dir = f"{model_output}_bundle"
+	os.makedirs(bundle_dir, exist_ok=True)
 	df.to_csv(data_output)
-	topic_model.save(model_output)
-	joblib.dump(kmeans, model_output+"_kmeans.pkl")
-	joblib.dump(topic_to_meta, model_output+"_topic_to_meta.pkl")
-	joblib.dump(meta_labels, model_output + "_meta_labels.pkl")
-	joblib.dump(embeddings, model_output+"_embeddings_"+sentenceTransformer+".pkl")
+	
+	topic_model.save(f"{bundle_dir}/bertopic")
+	joblib.dump(kmeans, f"{bundle_dir}/kmeans.pkl")
+	joblib.dump(topic_to_meta, f"{bundle_dir}/mapping.pkl")
+	joblib.dump(meta_labels, f"{bundle_dir}/labels.pkl")
+	joblib.dump(embeddings, f"{bundle_dir}/embeddings.pkl")
+	
+	### @@@ MLflow @@@ Store information in tracking server
+	with mlflow.start_run(run_name=run_name) as run:
+		run_id = run.info.run_id
+		mlflow.log_params({
+			"sentence_transformer": sentenceTransformer,
+			"n_clusters": n_clusters,
+			"sep": sep,
+			"colname": colname
+		})
+		mlflow.log_metric("n_documents", len(df))
+		mlflow.log_metric("n_topics", len(set(topics)) - (1 if -1 in topics else 0))
+		mlflow.log_metric("n_meta_clusters", n_clusters)
+		mlflow.log_metric("number_of_outliers", len(df.loc[df['meta_topic'] == -1]))
+		
+		mlflow.log_artifacts(bundle_dir, artifact_path=artifact_path)
+		mlflow.log_artifact(data_output, artifact_path=artifact_path)
 	
 def _cli():
     parser = argparse.ArgumentParser(
