@@ -61,19 +61,40 @@ stages:
       md5: 0b56f8c6b3cae914d53f40a57cc2ed8f
       size: 9303
     outs:
+    - path: data/clusterized.csv
+      hash: md5
+      md5: 41b2b391916afac68ae09b4b1525207b
+      size: 500211659
     - path: models/BERTopic
       hash: md5
-      md5: 34d4407f2a6845ab56d913d3c8beaca3
-      size: 440356595
+      md5: c06ce3ce25f700150bb2b1c78db88f95
+      size: 440198106
     - path: models/BERTopic_kmeans.pkl
       hash: md5
-      md5: 9d2ab793ebd843aee2ce447267ce0bb6
-      size: 33335
+      md5: 4240b58a3ec1172b26ad153b4bf0721d
+      size: 33331
     - path: models/BERTopic_meta_labels.pkl
       hash: md5
-      md5: da808388c6f3bb43b361ad971f5a25b0
-      size: 527
+      md5: a7e8f7baccc47db07002d27f99d2a884
+      size: 478
     - path: models/BERTopic_topic_to_meta.pkl
       hash: md5
-      md5: aa572ce3c1cdf55f7ee8a2f25e8b6af2
-      size: 8342
+      md5: e0a38c783af0b8aa7996fa9ea6470bc2
+      size: 8324
+  evaluate:
+    cmd: uv run src/evaluate.py --filepath data/clusterized.csv --metrics_output
+      metrics/silhouette.json
+    deps:
+    - path: data/clusterized.csv
+      hash: md5
+      md5: 41b2b391916afac68ae09b4b1525207b
+      size: 500211659
+    - path: src/evaluate.py
+      hash: md5
+      md5: 209febdc8a12bd0a69e8dc5415aa7fba
+      size: 3704
+    outs:
+    - path: metrics/silhouette.json
+      hash: md5
+      md5: 1790f99216ccc16d3afdd5c2ecda3346
+      size: 48
