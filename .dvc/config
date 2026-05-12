@@ -2,7 +2,7 @@
     remote = origin
     analytics = false
 [cache]
-    type = symlink
+    type = copy
 ['remote "origin"']
     url = s3://dvc
     endpointurl = https://dagshub.com/schmilblick-ai/Supply-Chain-MLOps.s3
