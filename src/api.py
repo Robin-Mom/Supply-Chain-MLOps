@@ -5,6 +5,8 @@ from sentence_transformers import SentenceTransformer
 import numpy as np
 import os
 import json
+import subprocess
+from fastapi import BackgroundTasks
 
 # ---------------------------------------------------------
 # CONFIGURATION & CHARGEMENT (Allégé)
@@ -100,3 +102,34 @@ def get_metrics():
 @app.get("/health")
 async def health_check():
     return {"status": "healthy"}
+
+# ---------------------------------------------------------
+# ENDPOINTS D'ENTRAÎNEMENT (DVC)
+# ---------------------------------------------------------
+
+@app.post("/train", tags=["MLOps"])
+async def trigger_train(background_tasks: BackgroundTasks):
+    """
+    Lance le pipeline DVC (preprocess -> train -> evaluate) 
+    en arrière-plan pour ne pas bloquer l'API.
+    """
+    def run_dvc():
+        try:
+            # On lance dvc repro comme tu le ferais dans le terminal
+            result = subprocess.run(
+                ["dvc", "repro"], 
+                capture_output=True, 
+                text=True, 
+                check=True
+            )
+            print(f"✅ DVC repro terminé avec succès :\n{result.stdout}")
+        except subprocess.CalledProcessError as e:
+            print(f"❌ Erreur lors de DVC repro :\n{e.stderr}")
+
+    # On lance la fonction dans une tâche de fond
+    background_tasks.add_task(run_dvc)
+    
+    return {
+        "status": "Training started",
+        "message": "Le pipeline DVC a été lancé en arrière-plan. Vérifie les logs du serveur pour le suivi."
+    }
