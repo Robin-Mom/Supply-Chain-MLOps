@@ -1,227 +1,91 @@
-# uv - reminder ?
+# 📦 Supply Chain MLOps - Analyse d'Avis Clients (Oscaro)
 
-    So in our progress to use uv and manage multiple environments let's consider the following scenario 
-    - let say we need to test an alternate env, while keeping something working and willing to try a litle alternative.
+Ce projet implémente un pipeline MLOps complet pour le clustering et l'analyse de sentiment des avis clients. L'architecture est conçue pour être collaborative (Git/DVC), trackée (MLflow) et prête pour la production (Docker).
 
-# summary of combinations
-    `uv env .bla`
-    `source .bla/Scripts/activate`
-    `uv sync`            ## may populate .venv (creating it in the background)
-    `uv sync --active`   ## might be dues if missconf bellow
-    `uv add foo`
-    `uv add foo --active`
+## 🛠️ Architecture du Projet
 
-## Explanations
-if you run *uv venv .bla*, you inherit a *.bla/Scripts/activate* that is hardcoded toward *.bla*, but not only,
-also toward its parent folder, preventing move and renaming of the parent folder with ease !!
-So what do you need to know if you wish to relocate you projet, case of a redeployment, this is what
-we explore here.
+Le projet est décomposé en micro-services orchestrés par Docker :
 
-if you rename your projet (for any conflict reason) or move it
-the activate script becomes obsolete, pointing to the old name and location (bouh)
+    Service API : Inférence en temps réel via FastAPI.
 
-So one suggestion is to go and update the scripts - but what a hell stupide to modify generated script by hand - at any time you loose your configs
+    Service Trainer : Exécution du pipeline de réentraînement via DVC.
 
-And so yep, you can `rm -rf .venv` because to retrieve the promise is that you simply need a `uv venv .bla` and a `uv sync`
-Well, not exaclty.
+    Tracking : Expériences et métriques centralisées sur DagsHub (MLflow).
 
-litle problem as uv is not taking into accout ut UV_VIRTUALENV defined, but goes to kind of hardcoded .venv - over and over
+    Storage : Modèles et données volumineux stockés sur le remote DVC de DagsHub.
 
-/!\ Hence, despite a proper .bla activation, a first uv sync will sync to .venv silently !!!
+## 🚀 Guide de Démarrage Rapide
 
-All next uv sync will complain that the active .bla is not matching the project environment path
+1. Prérequis
 
-    **warning**: `VIRTUAL_ENV=.bla` does not match the project environment path `.venv` and will be ignored; use `--active` to target the active environment instead
+    Docker & Docker Compose
 
-So when running `uv venv .bla`, this will create the .bla env with the new parent folder location
-"uv sync" this will rename
+    uv (pour la gestion locale des dépendances)
 
-IN ORDER TO KEEP uv sync TO the active env, there is two configurations to address
+    Un compte DagsHub avec accès au dépôt.
 
-The first one in .env file with 
-## .env
-`export UV_PROJECT_ENVIRONMENT=.bla`
+2. Configuration (Secrets)
 
-As a consequence, in a step you have to switch betweed env, it can be that the pyproject.toml might be impacted, the uv.lock as well - so it really depends on the attempt, it might be good to backup the toml
+Créez un fichier .env à la racine (non suivi par Git) :
 
-add this .env also to the .gitignore
+    Extrait de code
 
-second file to configure is the .vscode/settings.json, to allow vscode to use the .env injection
-## vscode/settings.json
-{
-    "python.terminal.useEnvFile": true,
-    "python.envFile": "${workspaceFolder}/.env"
-}
+    MLFLOW_TRACKING_URI=https://dagshub.com/votre-username/Supply-Chain-MLOps.mlflow
+    MLFLOW_TRACKING_USERNAME=votre-username
+    MLFLOW_TRACKING_PASSWORD=votre-token-dagshub
 
+3. Synchronisation
+Avant de lancer l'infrastructure, récupérez le code et les fichiers lourds :
 
-as most possible use
+    Bash
+    git pull origin main
+    dvc pull
 
-So it is, please take care !
+## 🏗️ Étapes Globales du Pipeline
 
+### Étape 1 : Préparation & Cleaning
+Le script src/train.py récupère les données brutes (data/avis_40k.csv), nettoie le texte (suppression des stop-words, lemmatisation avec Spacy) et prépare les features.
 
-#Next topic is about mlops now and how it articulates with git
+### Étape 2 : Entraînement & Clustering
+    Embeddings : Utilisation de SentenceTransformers pour vectoriser les avis.
 
-## 1. Stratégie Git : Le "GitHub Flow"
-Oubliez les branches par personne (ex: branche-marvin). On travaille par fonctionnalité. Si l'un de vous travaille sur la collecte et l'autre sur le dashboard, ils ne doivent pas se marcher sur les pieds.
-• main (ou master) : C'est votre "Saint Graal". Le code ici doit toujours être fonctionnel et prêt à être déployé. On ne push jamais directement dessus.
-• Branches de fonctionnalités (feature branches) : Chaque fois qu'une tâche commence, créez une branche dédiée :
-feat/collecte-data
-feat/training-pipeline
-feat/api-fastapi
-• Pull Requests (PR) : Quand une branche est finie, on fait une PR vers la main. Un des deux autres collègues doit valider le code avant la fusion. C'est le meilleur moyen d'apprendre les uns des autres.
+    Modèle : Utilisation de BERTopic pour l'extraction de thématiques.
 
-## 2. Division des tâches (Le "Qui fait quoi ?")
-Pour votre roadmap, je vous conseille une répartition par "pôles de responsabilité" plutôt que par petits tickets. Voici une proposition pour un binôme/trinôme :
-• Membre A (Le Data Engineer / Architecte) :
-Mise en place de la structure des dossiers.
-Scripts de collecte (collect.py) et de processing (process.py).
-Conteneurisation (Docker / Docker-compose).
-• Membre B (Le Data Scientist / ML Engineer) :
-Pipeline d'entraînement (train.py) et évaluation (evaluate.py).
-Tracking avec MLflow (Phase 2).
-Optimisation de BERTopic et réduction des thèmes.
-• Membre C (Le DevOps / Backend) :
-Création de l'API (FastAPI).
-Mise en place de la CI/CD (GitHub Actions).
-Monitoring (Phase 4).
+    Sérialisation : Le modèle est sauvegardé au format safetensors dans models/BERTopic/.
 
-## 3. Le problème des "Gros Fichiers" (Crucial)
-GitHub déteste les fichiers de plus de 50 Mo. Vos modèles BERTopic et vos datasets d'avis vont bloquer vos git push.
+### Étape 3 : Tracking & Versioning
+    Chaque run enregistre le Score de Silhouette et les hyperparamètres sur MLflow.
 
-`.gitignore` est votre meilleur ami : Ajoutez-y immédiatement les dossiers venv/, __pycache__/, les dossiers de modèles .safetensors et vos fichiers .csv.
-Alternative pour les modèles : Pour la Phase 2, vous utiliserez MLflow pour versionner les modèles. En attendant, partagez vos fichiers modèles via un Cloud (Drive, S3) ou utilisez Git LFS (Large File Storage).
+    DVC versionne les fichiers .pkl et les datasets, garantissant que le code sur Git correspond exactement au modèle utilisé.
 
+### Étape 4 : Déploiement en Micro-services
+L'application est conteneurisée pour garantir la portabilité :
 
-## 4. Structure de dossier standard (Cookiecutter ML)
-Mettez-vous d'accord dès le premier jour sur cette structure :
+    Lancer l'API : docker-compose up --build api (disponible sur http://localhost:8000/docs).
+
+    Lancer un Training : docker-compose run --rm trainer.
+
+## 👥 Workflow Collaboratif (Équipe de 3)
+
+Pour maintenir la stabilité du projet, l'équipe suit ces règles :
+
+    1. Branches : Toute modification se fait sur une branche feature/nom.
+
+    2. DVC First : Si le modèle change, on fait dvc push avant le git push.
+
+    3. Review : Les modifications de l'infrastructure Docker doivent être testées localement par au moins deux membres avant le merge sur main.
+
+## 📂 Structure des fichiers
 Plaintext
+.
+├── src/                # Scripts source (api.py, train.py)
+├── models/             # Modèles (gérés par DVC)
+├── data/               # Datasets (gérés par DVC)
+├── metrics/            # Scores JSON
+├── Dockerfile          # Image Python optimisée avec uv
+├── docker-compose.yml  # Orchestration des services
+├── dvc.yaml            # Définition du pipeline DVC
+└── pyproject.toml      # Dépendances du projet
 
-PROJET_TRUSTPILOT/
-│
-├── data/               # Dossier ignoré par Git (contient les CSV)
-├── models/             # Dossier ignoré par Git (contient les .safetensors)
-├── src/                # Le code source
-│   ├── collect.py
-│   ├── process.py
-│   ├── train.py
-│   └── inference.py
-├── notebooks/          # Pour vos tests brouillons
-├── app/                # Code Streamlit ou FastAPI
-├── tests/              # Tests unitaires (Phase 3)
-├── Dockerfile
-├── requirements.txt
-├── README.md 
-└──.gitignore
-
-
-Mon conseil "Wit" :
-
-`I 'm a poor Lonesome Coder, and a long way from /home`
-
-Ne devenez pas des "codeurs solitaires". Le MLOps est une discipline de collaboration. Si le membre A change le format du CSV dans process.py sans prévenir le membre B qui entraîne le modèle, tout explose. Communiquez sur Slack/Discord à chaque fusion de branche !
-
-Les agents IA ne procèdent pas autrement !
-
-## Mise en oeuvre
-
-Sur un dossier local, ou remote sur la vm, peut import
-
-- créer le dossier 
-
-- y préparer un README.md
-
-créer l'aroborescence de dossier et les fichiers vide
-
-`mkdir data models src notebooks app tests Dockerfile`
-
-`touch src/collect.py src/process.py src/train.py src/inference.py requirement.txt .gitignore`
-
-## on ajoute des .gitkeep pour garder la structure des dossiers et assurer un clonage facile
-`for f in data models notebooks app tests Dockerfile; do touch $f/.gitkeep; done`
-
-Note Dockerfile
-
-    The docker build command expects the file name to exactly be Dockerfile. So, in that case, you can simply do
-
-    `docker build .`
-
-    In other cases, you have to specify the full name as
-
-    `docker build -f Dockerfile.build .`
-
-remplir le .gitignore dés le début
-
-```
-# Python-generated files
-__pycache__/
-*.py[oc]
-build/
-dist/
-wheels/
-data/
-
-*.egg-info
-
-# Virtual environments
-.venv
-.sl
-
-# Modèles lourds on commente si on passe en git LFS
-# *.h5
-# *.keras
-# *.pkl
-# *.csv
-
-# IDE
-*.vscode
-!.vscode/settings.json
-.env
-.streamlit/secrets.toml
-```
-
-## initialiser git
-
-`git init`
-
-## Ajoutez votre URL remote (récupérez-la sur votre page GitHub)
-au passage example de Yohan https://github.com/DataScientest/exam_Bash_MLOps# 
-et rappel sur cookiecutter https://github.com/cookiecutter/cookiecutter
-
-## créer le repo sur github avec `new`
-https://github.com/new
-
-## brancher le repo local au repo remote via http
-    `git remote add origin https://github.com/schmilblick-ai/Supply-Chain-MLOps.git`
-
-ou via ssh (avec ssh key defini dans votre home directory machine / user)
-
-    `git remote add origin git@github.com:schmilblick-ai/Supply-Chain-MLOps.git`
-
-et si on change d'avis ?? on peut refaire mais il faut d'abord un remove
-
-    `git remote remove origin`
-
-
-## La taille du Repo à regarder de temps en temps
-    `curl -s https://api.github.com/repos/USER/REPO | grep size`
-    `curl -s https://api.github.com/repos/schmilblick-ai/Supply-Chain-MLOps | grep size`
-
-## vérification du git remote
-    `git remote -v`
-
-## premier commit propre, staging (litéralement exposition sur la scène ou sortie de la coulisse) et commit
-    `git add .`
-    `git commit -m "Initial commit: Tabula Rasa (Clean start)"`
-
-## un premier push
-    `git push`
-
-et non pas assez
-
-## To push the current branch and set the remote as upstream, use we also need to force due to remote creation and to avoid an initial pull
-    `git push --force --set-upstream origin main`
-
-
-Merci à Stéphane Robert pour ses innombrables tuyaux
-
-https://blog.stephane-robert.info/docs/conteneurs/images-conteneurs/optimiser-taille-image/
+## 💡 Tips pour l'équipe
+Si vous obtenez une erreur de fichier manquant au lancement de Docker, vérifiez que vous avez bien fait un dvc pull sur votre machine hôte. Le volume Docker partage vos fichiers locaux avec le container !
