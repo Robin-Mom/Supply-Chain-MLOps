@@ -62,7 +62,7 @@ def run_spacy_pipeline():
     log.info(f"Traitement terminé en {duration:.2f} minutes.")
 
     log.info(f"Sauvegarde vers {OUTPUT_FILE}...")
-    df.to_csv(OUTPUT_FILE, index=False, sep=';')
+    df.to_csv(OUTPUT_FILE, index=False, sep=',', quoting=1)
     log.info("Fichier prêt pour BERTopic !")
 
 if __name__ == "__main__":
