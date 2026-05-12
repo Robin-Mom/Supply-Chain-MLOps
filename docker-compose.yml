@@ -1,0 +1,10 @@
+services:
+  # L'API Oscaro Trust Pilot
+  api:
+    build: .
+    ports:
+      - "8000:8000"
+    volumes:
+      - .:/app  # Permet de voir les modifs de code en temps réel (développement)
+    env_file:
+      - .env  # On va mettre tes identifiants DagsHub ici pour la sécurité
