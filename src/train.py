@@ -31,16 +31,14 @@ import mlflow
 
 ### MAIN
 
-def main(verbose, filepath, sep, colname, sentenceTransformer, n_clusters, model_output, data_output, log_output, gpu_accel):
+def main(verbose, exp_name, run_name, artifact_path, filepath, sep, colname, sentenceTransformer, n_clusters, model_output, data_output, log_output, gpu_accel):
 
 
 ### @@@ MLflow @@@ Set tracking experiment
 	mlflow.set_tracking_uri("http://127.0.0.1:8080")
 
 ### @@@ MLflow @@@ Define experiment name, run name and artifact_path name
-	trustpilot_experiment = mlflow.set_experiment("Trustpilot_Bertopic")
-	run_name = "first_run"
-	artifact_path = "bert_paraphrase_mpnetv2_trustpilot"
+	trustpilot_experiment = mlflow.set_experiment(exp_name)
 
 	# -------------------------
 	# 1. Données
@@ -238,6 +236,9 @@ def _cli():
             formatter_class=argparse.ArgumentDefaultsHelpFormatter,
             argument_default=argparse.SUPPRESS)
     parser.add_argument('-v', '--verbose', action='store_true', default=False, help="Boolean: activate verbose mode. Default is no verbose.")
+    parser.add_argument('-en', '--exp_name', default="Trustpilot_Bertopic", type=str, help="Name of MLFlow experiment.")
+    parser.add_argument('-rn', '--run_name', default="first_run", type=str, help="Name MLFlow run.")
+    parser.add_argument('-ap', '--artifact_path', default="bert_paraphrase_mpnetv2_trustpilot", type=str, help="Name of MLFlow artifact path.")
     parser.add_argument('-f', '--filepath', default="data/processed.csv", type=str, help="path to your input csv file of processed dataset")
     parser.add_argument('-s', '--sep', default=',', type=str, help="separator to parse input csv")
     parser.add_argument('-cn', '--colname', default="commentaire", type=str, help="Column name in processed data dataframe to use for embeddings")
