@@ -14,6 +14,8 @@ COPY --from=ghcr.io/astral-sh/uv:latest /uv /uvx /bin/
 COPY pyproject.toml uv.lock ./
 
 # Installer 'uv' pour gérer les dépendances rapidement
+ENV UV_LINK_MODE=copy
+
 RUN uv sync --frozen --no-install-project
 
 # Copier le reste du code (dont le dossier src et models)

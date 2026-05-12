@@ -6,6 +6,7 @@ services:
       - "8000:8000"
     volumes:
       - .:/app  # Permet de voir les modifs de code en temps réel (développement)
+      - /app/.venv
     env_file:
       - .env  # On va mettre tes identifiants DagsHub ici pour la sécurité
     # On s'assure que l'API ne se lance que si les modèles sont là
