@@ -22,3 +22,24 @@ stages:
       - data/avis_cleaned.csv
     outs:
       - data/avis_bertopic.csv
+
+  train:
+      cmd: uv run src/train.py --filepath data/avis_bertopic.csv --model_output models/BERTopic
+      deps:
+        - src/train.py
+        - data/avis_bertopic.csv
+      outs:
+        - models/BERTopic
+        - models/BERTopic_kmeans.pkl
+        - models/BERTopic_meta_labels.pkl
+        - models/BERTopic_topic_to_meta.pkl
+        - data/clusterized.csv
+  
+  evaluate:
+    cmd: uv run src/evaluate.py --filepath data/clusterized.csv --metrics_output metrics/silhouette.json
+    deps:
+      - src/evaluate.py
+      - data/clusterized.csv
+    metrics:
+      - metrics/silhouette.json:
+          cache: false
