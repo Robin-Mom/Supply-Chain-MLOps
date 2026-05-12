@@ -1,12 +1,12 @@
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException, BackgroundTasks
+import subprocess
 from pydantic import BaseModel
 import joblib
 from sentence_transformers import SentenceTransformer
 import numpy as np
 import os
 import json
-import subprocess
-from fastapi import BackgroundTasks
+
 
 # ---------------------------------------------------------
 # CONFIGURATION & CHARGEMENT (Allégé)
