@@ -33,6 +33,7 @@ stages:
         - models/BERTopic_kmeans.pkl
         - models/BERTopic_meta_labels.pkl
         - models/BERTopic_topic_to_meta.pkl
+        - models/BERTopic_embeddings.pkl
         - data/clusterized.csv
   
   evaluate:

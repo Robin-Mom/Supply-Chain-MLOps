@@ -28,6 +28,7 @@ from bertopic.vectorizers import ClassTfidfTransformer
 from spacy.lang.fr.stop_words import STOP_WORDS
 import joblib
 import mlflow
+import dagshub
 
 ### MAIN
 
@@ -35,11 +36,18 @@ def main(verbose, exp_name, run_name, artifact_path, filepath, sep, colname, sen
 
 
 ### @@@ MLflow @@@ Set tracking experiment
-	mlflow.set_tracking_uri("http://127.0.0.1:8080")
+# On commente ou on supprime la ligne locale :
+#	mlflow.set_tracking_uri("http://127.0.0.1:8080")
+
+	dagshub.init(repo_owner='schmilblick-ai', repo_name='Supply-Chain-MLOps', mlflow=True)
+
+# On laisse MLflow utiliser la variable d'environnement MLFLOW_TRACKING_URI 
+# que tu as configurée avec DagsHub.
+
 
 ### @@@ MLflow @@@ Define experiment name, run name and artifact_path name
+# Option sûre : force "Default" ou utilise exp_name si tu l'as créé sur DagsHub
 	trustpilot_experiment = mlflow.set_experiment(exp_name)
-
 	# -------------------------
 	# 1. Données
 	# -------------------------
@@ -199,19 +207,21 @@ def main(verbose, exp_name, run_name, artifact_path, filepath, sep, colname, sen
 	log.info("Saving outputs")
 	with open(log_output, "a", encoding="utf-8") as f:
 		f.write("Saving outputs\n")
+
 	datadir = os.path.dirname(data_output)
 	os.makedirs(datadir, exist_ok=True)
+	
 	modeldir = os.path.dirname(model_output)
 	os.makedirs(modeldir, exist_ok=True)
-	bundle_dir = f"{model_output}_bundle"
-	os.makedirs(bundle_dir, exist_ok=True)
-	df.to_csv(data_output)
 	
-	topic_model.save(f"{bundle_dir}/bertopic")
-	joblib.dump(kmeans, f"{bundle_dir}/kmeans.pkl")
-	joblib.dump(topic_to_meta, f"{bundle_dir}/mapping.pkl")
-	joblib.dump(meta_labels, f"{bundle_dir}/labels.pkl")
-	joblib.dump(embeddings, f"{bundle_dir}/embeddings.pkl")
+	df.to_csv(data_output, index=False)
+	
+	topic_model.save(model_output, serialization="safetensors")
+	
+	joblib.dump(kmeans, f"{model_output}_kmeans.pkl")
+	joblib.dump(meta_labels, f"{model_output}_meta_labels.pkl")
+	joblib.dump(topic_to_meta, f"{model_output}_topic_to_meta.pkl")
+	joblib.dump(embeddings, f"{model_output}_embeddings.pkl")
 	
 	### @@@ MLflow @@@ Store information in tracking server
 	with mlflow.start_run(run_name=run_name) as run:
@@ -227,7 +237,7 @@ def main(verbose, exp_name, run_name, artifact_path, filepath, sep, colname, sen
 		mlflow.log_metric("n_meta_clusters", n_clusters)
 		mlflow.log_metric("number_of_outliers", len(df.loc[df['meta_topic'] == -1]))
 		
-		mlflow.log_artifacts(bundle_dir, artifact_path=artifact_path)
+		mlflow.log_artifacts(model_output, artifact_path=artifact_path)
 		mlflow.log_artifact(data_output, artifact_path=artifact_path)
 	
 def _cli():
