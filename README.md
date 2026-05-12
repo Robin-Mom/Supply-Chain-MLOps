@@ -76,6 +76,7 @@ Pour maintenir la stabilité du projet, l'équipe suit ces règles :
     3. Review : Les modifications de l'infrastructure Docker doivent être testées localement par au moins deux membres avant le merge sur main.
 
 ## 📂 Structure des fichiers
+```
 Plaintext
 .
 ├── src/                # Scripts source (api.py, train.py)
@@ -86,6 +87,6 @@ Plaintext
 ├── docker-compose.yml  # Orchestration des services
 ├── dvc.yaml            # Définition du pipeline DVC
 └── pyproject.toml      # Dépendances du projet
-
+```
 ## 💡 Tips pour l'équipe
 Si vous obtenez une erreur de fichier manquant au lancement de Docker, vérifiez que vous avez bien fait un dvc pull sur votre machine hôte. Le volume Docker partage vos fichiers locaux avec le container !
