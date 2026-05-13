@@ -1,0 +1,6 @@
+uv.lock merge=union
+# => please run uv lock at PR time
+#git checkout HEAD -- uv.lock      # garder notre version
+#uv lock                            # regénérer proprement
+#git add uv.lock
+#git commit -m "chore: regen lock after merge"
