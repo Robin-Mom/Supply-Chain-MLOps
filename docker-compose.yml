@@ -1,22 +1,28 @@
 services:
   # Service 1 : L'API (Inférence) Oscaro Trust Pilot
   api:
-    build: .
+    build: 
+      context: .
+      args:
+        BACKEND_EXTRA: ${BACKEND_EXTRA:-cpu}
     ports:
       - "8000:8000"
     volumes:
-      - .:/app  # Permet de voir les modifs de code en temps réel (développement)
+      - .:/app  # Permet de voir les modifs de code en temps réel (développement hot-reload de FastAPI)
+      #- .:/home/ubuntu/app
     env_file:
-      - .env  # On va mettre tes identifiants DagsHub ici pour la sécurité
+      #- .env  # On va mettre tes identifiants DagsHub ici pour la sécurité
+      - .dvc/config.local  # On va mettre tes identifiants DagsHub ici pour la sécurité
     # On s'assure que l'API ne se lance que si les modèles sont là
     command: ["uv", "run", "uvicorn", "src.api:app", "--host", "0.0.0.0", "--port", "8000"]
   
   # Service 2 : Le Trainer (Cycle de vie ML)
   trainer:
-    build: .
+    build: 
+      context: .
     volumes:
       - .:/app
     env_file:
-      - .env
+      - .dvc/config.local
     # Ce container s'éteint tout seul une fois l'entraînement fini
     command: ["uv", "run", "dvc", "repro", "--force"]

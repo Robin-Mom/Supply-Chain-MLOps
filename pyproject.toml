@@ -34,3 +34,32 @@ dev = [
 [tool.setuptools.packages.find]
 where = ["."]
 include = ["src*"]
+
+[project.optional-dependencies]
+cpu = ["torch>=2.0"]
+gpu = ["torch>=2.0"]
+
+# ← dire à uv que cpu et gpu ne peuvent pas coexister
+[tool.uv]
+conflicts = [
+    [
+        { extra = "cpu" },
+        { extra = "gpu" },
+    ]
+]
+
+[[tool.uv.index]]
+name = "pytorch-cpu"
+url  = "https://download.pytorch.org/whl/cpu"
+explicit = true
+
+[[tool.uv.index]]
+name = "pytorch-cu124"
+url  = "https://download.pytorch.org/whl/cu124"
+explicit = true
+
+[tool.uv.sources]
+torch = [
+    { index = "pytorch-cpu",   extra = "cpu" },
+    { index = "pytorch-cu124", extra = "gpu" },
+]
