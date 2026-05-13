@@ -13,8 +13,8 @@ services:
     env_file:
       #- .env  # On va mettre tes identifiants DagsHub ici pour la sécurité
       - .dvc/config.local  # On va mettre tes identifiants DagsHub ici pour la sécurité
-    # On s'assure que l'API ne se lance que si les modèles sont là
-    command: ["/app/.venv/bin/uvicorn", "src.api:app", "--host", "0.0.0.0", "--port", "8000"]
+    # On s'assure que l'API ne se lance que si les modèles sont là +++ avec le --reload si src change
+    command: ["/app/.venv/bin/uvicorn", "src.api:app", "--host", "0.0.0.0", "--port", "8000", "--reload"]
     #command: ["ls","-arl","/app/.venv/bin/uvicorn"]
 
   # Service 2 : Le Trainer (Cycle de vie ML)
