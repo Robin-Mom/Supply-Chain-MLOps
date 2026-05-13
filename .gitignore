@@ -32,3 +32,6 @@ models/*
 
 # Logs du pipeline (On ne les push pas sur Git)
 logs/
+
+#docker disk usage
+ddu/*
