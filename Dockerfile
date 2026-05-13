@@ -1,8 +1,8 @@
-# 4 idée pour être léger
+# 4 idée pour être léger -> de 10GB à 2.7GB
 # 1/ image de départ légère
-# 2/ gestion du cache uv et cache externe le cache uv n'est pas embarqué dans l'image
-# 3/ suppression des outils de build
-# 4/ gestion du backend selectif gpu ou cpu à paramétrer ultérieurement
+# 2/ gestion du cache uv et cache externe - le cache uv n'est pas embarqué dans l'image
+# 3/ suppression des outils de build par couche secondaire - secondary layer après un builder layer
+# 4/ gestion du backend selectif gpu ou cpu à paramétrer via BACKEND_EXTRA et en liens à la section uv/pyproject.tom
 
 # Utiliser une image Python légère
 FROM python:3.12-slim as builder
@@ -36,7 +36,9 @@ RUN --mount=type=cache,target=/home/ubuntu/.cache/uv,uid=1000,gid=1000 \
 # Copier le reste du code (dont le dossier src et models) - invalide le cache
 COPY --chown=ubuntu:ubuntu . .
 
-#Installe uniquement le package supply-chain-mlops par-dessus - Très rapide car les deps sont déjà là -Ce layer est léger et se rebuilde vite
+#Installe uniquement le package supply-chain-mlops par-dessus - 
+    # Très rapide car les deps sont déjà là -Ce layer est léger et se rebuilde vite
+    # utile en cas de cyclage de mise au point sur le source
 RUN --mount=type=cache,target=/home/ubuntu/.cache/uv,uid=1000,gid=1000 \
     uv sync --extra ${BACKEND_EXTRA} --no-cache --frozen
 
@@ -44,7 +46,7 @@ RUN --mount=type=cache,target=/home/ubuntu/.cache/uv,uid=1000,gid=1000 \
 # multi-stage build pour supprimer les outils de build (gcc, build-essential) de l'image finale
 FROM python:3.12-slim
 
-# 1. Copier uv AVANT de changer d'utilisateur (nécessite root)
+# 1. Copier uv AVANT de changer d'utilisateur (nécessite root) copie local évitant trafique réseau
 COPY --from=builder /bin/uv /bin/uv
 COPY --from=builder /bin/uvx /bin/uvx
 
@@ -57,5 +59,5 @@ USER ubuntu
 # Exposer le port de l'API
 EXPOSE 8000
 
-# Commande pour lancer l'API - pas avec uv run qui refait l'install
+# Commande pour lancer l'API - pas avec uv run qui refait l'install - à voir aussi dans le docker compose
 CMD [".venv/bin/uvicorn", "src.api:app", "--host", "0.0.0.0", "--port", "8000"]
