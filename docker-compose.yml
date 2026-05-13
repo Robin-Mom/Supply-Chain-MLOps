@@ -9,20 +9,22 @@ services:
       - "8000:8000"
     volumes:
       - .:/app  # Permet de voir les modifs de code en temps réel (développement hot-reload de FastAPI)
-      #- .:/home/ubuntu/app
+      - /app/.venv  #volume anonyme qui protège le .venv de l'image
     env_file:
       #- .env  # On va mettre tes identifiants DagsHub ici pour la sécurité
       - .dvc/config.local  # On va mettre tes identifiants DagsHub ici pour la sécurité
     # On s'assure que l'API ne se lance que si les modèles sont là
-    command: ["uv", "run", "uvicorn", "src.api:app", "--host", "0.0.0.0", "--port", "8000"]
-  
+    command: ["/app/.venv/bin/uvicorn", "src.api:app", "--host", "0.0.0.0", "--port", "8000"]
+    #command: ["ls","-arl","/app/.venv/bin/uvicorn"]
+
   # Service 2 : Le Trainer (Cycle de vie ML)
   trainer:
     build: 
       context: .
     volumes:
-      - .:/app
+      - .:/app       #la aussi config qui branche le dossier local sur /app de l'image
+      - /app/.venv
     env_file:
       - .dvc/config.local
-    # Ce container s'éteint tout seul une fois l'entraînement fini
-    command: ["uv", "run", "dvc", "repro", "--force"]
+    # Ce container s'éteint tout seul une fois l'entraînement fini - éviter aussi le uv run qui réinstall cpu et gpu indistinctement
+    command: ["/app/.venv/bin/dvc", "repro", "--force"]
