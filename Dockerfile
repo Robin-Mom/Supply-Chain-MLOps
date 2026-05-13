@@ -13,14 +13,14 @@ RUN apt-get update && \
     apt-get install -y --no-install-recommends git build-essential gcc && \
     rm -rf /var/lib/apt/lists/*
 
+# Installation de 'uv' pour une gestion ultra-rapide des packages
+COPY --from=ghcr.io/astral-sh/uv:latest /uv /uvx /bin/
+
 RUN useradd -m ubuntu
 USER ubuntu
 
 # Définir le répertoire de travail
 WORKDIR /app
-
-# Installation de 'uv' pour une gestion ultra-rapide des packages
-COPY --chown=ubuntu:ubuntu --from=ghcr.io/astral-sh/uv:latest /uv /uvx /bin/
 
 # cpu gpu -> default cpu
 ARG BACKEND_EXTRA=cpu
@@ -43,6 +43,11 @@ RUN --mount=type=cache,target=/home/ubuntu/.cache/uv,uid=1000,gid=1000 \
 # Étape 2 : Image finale (sans outils de build)
 # multi-stage build pour supprimer les outils de build (gcc, build-essential) de l'image finale
 FROM python:3.12-slim
+
+# 1. Copier uv AVANT de changer d'utilisateur (nécessite root)
+COPY --from=builder /bin/uv /bin/uv
+COPY --from=builder /bin/uvx /bin/uvx
+
 RUN useradd -m ubuntu
 USER ubuntu
 WORKDIR /app
@@ -52,5 +57,5 @@ USER ubuntu
 # Exposer le port de l'API
 EXPOSE 8000
 
-# Commande pour lancer l'API
-CMD ["uv", "run", "uvicorn", "src.api:app", "--host", "0.0.0.0", "--port", "8000"]
+# Commande pour lancer l'API - pas avec uv run qui refait l'install
+CMD [".venv/bin/uvicorn", "src.api:app", "--host", "0.0.0.0", "--port", "8000"]

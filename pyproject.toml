@@ -41,12 +41,7 @@ gpu = ["torch>=2.0"]
 
 # ← dire à uv que cpu et gpu ne peuvent pas coexister
 [tool.uv]
-conflicts = [
-    [
-        { extra = "cpu" },
-        { extra = "gpu" },
-    ]
-]
+conflicts = [[{ extra = "cpu" },{ extra = "gpu" }]]
 
 [[tool.uv.index]]
 name = "pytorch-cpu"
