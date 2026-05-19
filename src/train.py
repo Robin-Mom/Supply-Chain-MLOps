@@ -246,7 +246,7 @@ def _cli():
             formatter_class=argparse.ArgumentDefaultsHelpFormatter,
             argument_default=argparse.SUPPRESS)
     parser.add_argument('-v', '--verbose', action='store_true', default=False, help="Boolean: activate verbose mode. Default is no verbose.")
-    parser.add_argument('-en', '--exp_name', default="Trustpilot_Bertopic", type=str, help="Name of MLFlow experiment.")
+    parser.add_argument('-en', '--exp_name', default="Bertopic_Trustpilot", type=str, help="Name of MLFlow experiment.")
     parser.add_argument('-rn', '--run_name', default="first_run", type=str, help="Name MLFlow run.")
     parser.add_argument('-ap', '--artifact_path', default="bert_paraphrase_mpnetv2_trustpilot", type=str, help="Name of MLFlow artifact path.")
     parser.add_argument('-f', '--filepath', default="data/processed.csv", type=str, help="path to your input csv file of processed dataset")
@@ -271,15 +271,4 @@ def _cli():
 
 if __name__ == '__main__':
     main(**_cli())
-
-
-
-
-
-
-
-
-
-
-
 
