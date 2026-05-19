@@ -2,7 +2,7 @@ name: Supply Chain MLOps CI
 
 on:
   push:
-    branches: [ main, feat/ci-pipeline ] # Ajout de la branche pour tester la CI immédiatement
+    branches: [ main, feat/ci-pipeline ]
   pull_request:
     branches: [ main ]
 
@@ -10,12 +10,12 @@ jobs:
   ci-pipeline:
     runs-on: ubuntu-latest
     
-    # On injecte les variables d'environnement pour TOUT le job de CI
     env:
       MLFLOW_TRACKING_URI: "https://dagshub.com/schmilblick-ai/Supply-Chain-MLOps.mlflow"
       MLFLOW_TRACKING_USERNAME: "marv1-ops"
-      # Le mot de passe reste secret, on va le chercher dans les secrets GitHub
       MLFLOW_TRACKING_PASSWORD: ${{ secrets.MLFLOW_TRACKING_PASSWORD }}
+      # On ajoute le token DagsHub pour éviter le blocage de l'authentification interactive
+      DAGSHUB_CLIENT_TOKEN: ${{ secrets.DAGSHUB_CLIENT_TOKEN }}
 
     steps:
       - name: Checkout code
@@ -37,7 +37,6 @@ jobs:
       - name: Install dependencies
         run: uv sync --all-groups
 
-      # Vos tests unitaires auront maintenant accès aux variables MLflow !
       - name: Run unit tests
         run: |
           uv run pytest
@@ -46,7 +45,8 @@ jobs:
         uses: docker/build-push-action@v6
         with:
           context: .
-          file: ./Dockerfile
+          # FIX: On pointe vers le nouveau chemin de ton Dockerfile API
+          file: ./docker/api.Dockerfile 
           tags: supply-chain-mlops-api:test
           push: false
           cache-from: type=gha
