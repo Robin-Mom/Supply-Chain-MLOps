@@ -1,7 +1,7 @@
 schema: '2.0'
 stages:
   preprocess:
-    cmd: uv run src/preprocess.py
+    cmd: python src/preprocess.py
     deps:
     - path: data/avis_40k.csv
       hash: md5
@@ -17,7 +17,7 @@ stages:
       md5: f0ebb653f6335b8657c61547c1b23572
       size: 20623543
   nlp_simple:
-    cmd: uv run src/preprocess_nlp.py
+    cmd: python src/preprocess_nlp.py
     deps:
     - path: data/avis_cleaned.csv
       hash: md5
@@ -33,7 +33,7 @@ stages:
       md5: b36b8de537328709b48a33a2ef242bab
       size: 24081047
   spacy_lemmatization:
-    cmd: uv run src/preprocess_spacy.py
+    cmd: python src/preprocess_spacy.py
     deps:
     - path: data/avis_cleaned.csv
       hash: md5
@@ -49,7 +49,7 @@ stages:
       md5: 004c6d552a699965607d010e4722e0c2
       size: 24591821
   train:
-    cmd: uv run src/train.py --filepath data/avis_bertopic.csv --model_output 
+    cmd: python src/train.py --filepath data/avis_bertopic.csv --model_output 
       models/BERTopic
     deps:
     - path: data/avis_bertopic.csv
@@ -58,34 +58,34 @@ stages:
       size: 24591821
     - path: src/train.py
       hash: md5
-      md5: 4b6c7694e72e31c6481c028e6a68dbbc
-      size: 10975
+      md5: 1310661e7f797ede8a9f414710fde0bc
+      size: 10964
     outs:
     - path: data/clusterized.csv
       hash: md5
-      md5: 05ec88615724761cf47e4ffd4cf4a212
-      size: 500050292
+      md5: 7c800d2527164ada0c7f6c93c152fe3e
+      size: 500025800
     - path: models/BERTopic
       hash: md5
-      md5: d884de0cb89876686dc3d2ddd0114066.dir
-      size: 2128536
+      md5: 070417d3911f77b7f3e6c3ce6e843e12.dir
+      size: 2051263
       nfiles: 3
     - path: models/BERTopic_embeddings.pkl
       hash: md5
-      md5: b0c15847c46c6577553ffa46132db134
+      md5: 7f122a973d3636d4760150ee77ad5817
       size: 122689777
     - path: models/BERTopic_kmeans.pkl
       hash: md5
-      md5: 1fe6b7cdeef2af9a55d8940e216617ef
-      size: 33327
+      md5: 53b1e3fdc804734578567671a0be0dfc
+      size: 33247
     - path: models/BERTopic_meta_labels.pkl
       hash: md5
-      md5: c25b7cf8b9515a99df32db38e9f7a331
-      size: 513
+      md5: db38387a5222b3ae31948fb34460736a
+      size: 543
     - path: models/BERTopic_topic_to_meta.pkl
       hash: md5
-      md5: 7ec65e157a4c118e8245fa35d6581a42
-      size: 8306
+      md5: 32c7960330b7b7fbba6cb5d2b76ae8b4
+      size: 7946
   evaluate:
     cmd: uv run src/evaluate.py --filepath data/clusterized.csv --metrics_output
       metrics/silhouette.json
