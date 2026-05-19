@@ -1,0 +1,5 @@
+outs:
+- md5: 0f8a81639aa05081611f47515e0fc059
+  size: 58769137
+  hash: md5
+  path: BERTopic_paraphrase-multilingual-MiniLM-L12-v2_embeddings.pkl

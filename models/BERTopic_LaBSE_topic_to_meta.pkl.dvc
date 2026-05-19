@@ -1,0 +1,5 @@
+outs:
+- md5: 4fccd6b222fb407bcee418db4bb92ac0
+  size: 6830
+  hash: md5
+  path: BERTopic_LaBSE_topic_to_meta.pkl
