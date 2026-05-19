@@ -9,6 +9,9 @@ export AIRFLOW_GID := 0
 airflow_init:
 	$(DOCKER_COMPOSE) -f airflow/docker-compose.yaml up airflow-init
 
+airflow_up:
+	$(DOCKER_COMPOSE) -f airflow/docker-compose.yaml up -d
+
 # AIRFLOW SECTION
 airflow_force_recreate:
 	$(DOCKER_COMPOSE) -f airflow/docker-compose.yaml up --force-recreate
