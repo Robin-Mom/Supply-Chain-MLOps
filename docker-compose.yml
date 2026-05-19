@@ -1,7 +1,9 @@
 services:
   # Service 1 : L'API (Inférence) Oscaro Trust Pilot
   api:
-    build: .
+    build:
+      context: .
+      dockerfile: docker/api.Dockerfile  # On peut avoir un Dockerfile spécifique pour l'API
     ports:
       - "8000:8000"
     volumes:
@@ -10,14 +12,16 @@ services:
     env_file:
       - .env  # On va mettre tes identifiants DagsHub ici pour la sécurité
     # On s'assure que l'API ne se lance que si les modèles sont là
-    command: ["uv", "run", "uvicorn", "src.api:app", "--host", "0.0.0.0", "--port", "8000"]
+    command: ["uvicorn", "src.api:app", "--host", "0.0.0.0", "--port", "8000"]
   
   # Service 2 : Le Trainer (Cycle de vie ML)
   trainer:
-    build: .
+    build:
+      context: .
+      dockerfile: docker/trainer.Dockerfile  # Un Dockerfile spécifique pour le trainer
     volumes:
       - .:/app
     env_file:
       - .env
     # Ce container s'éteint tout seul une fois l'entraînement fini
-    command: ["uv", "run", "dvc", "repro", "--force"]
+    command: ["dvc", "repro", "--force"]
