@@ -1,0 +1,5 @@
+# requirements-gpu.txt
+-r requirements-base.txt
+torch
+torchvision
+torchaudio
