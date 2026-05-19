@@ -9,6 +9,12 @@ export AIRFLOW_GID := 0
 airflow_init:
 	$(DOCKER_COMPOSE) -f airflow/docker-compose.yaml up airflow-init
 
+#La commande ci-dessus est à exécuter à chaque redémarrage de votre machine virtuelle sinon l'erreur suivante sera levée 
+# : docker.errors.DockerException: Error while fetching server API version: ('Connection aborted.', PermissionError(13, 'Permission denied'))
+# prereq juste pour utiliser le DockerOperator
+airflow_prepdocker_sock:
+	sudo chmod a+rw /var/run/docker.sock
+
 airflow_up:
 	$(DOCKER_COMPOSE) -f airflow/docker-compose.yaml up -d
 
@@ -24,9 +30,6 @@ airflow_reset:
 
 airflow_ps:
 	$(DOCKER_COMPOSE) -f airflow/docker-compose.yaml ps
-
-airflow_prepdocker_sock:
-	sudo chmod a+rw /var/run/docker.sock
 
 # GLOBAL SECTION
 up:
