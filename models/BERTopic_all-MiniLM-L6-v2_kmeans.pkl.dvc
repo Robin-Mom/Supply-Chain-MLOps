@@ -1,0 +1,5 @@
+outs:
+- md5: b053315e396500657136325d8df7849c
+  size: 17999
+  hash: md5
+  path: BERTopic_all-MiniLM-L6-v2_kmeans.pkl
