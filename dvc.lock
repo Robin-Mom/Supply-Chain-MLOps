@@ -58,17 +58,17 @@ stages:
       size: 24591821
     - path: src/train.py
       hash: md5
-      md5: 1310661e7f797ede8a9f414710fde0bc
-      size: 10964
+      md5: 04be915ab9dcedfc8a3c2afae52da2de
+      size: 11050
     outs:
     - path: data/clusterized.csv
       hash: md5
-      md5: 7c800d2527164ada0c7f6c93c152fe3e
-      size: 500025800
+      md5: aabe53cc50ba7066f85ef6c9d031bbd3
+      size: 500104419
     - path: models/BERTopic
       hash: md5
-      md5: 070417d3911f77b7f3e6c3ce6e843e12.dir
-      size: 2051263
+      md5: 0130d8d829cbdd1ebf0d62c2724a4740.dir
+      size: 2075103
       nfiles: 3
     - path: models/BERTopic_embeddings.pkl
       hash: md5
@@ -76,30 +76,30 @@ stages:
       size: 122689777
     - path: models/BERTopic_kmeans.pkl
       hash: md5
-      md5: 53b1e3fdc804734578567671a0be0dfc
-      size: 33247
+      md5: c06d646ed991177cb9d861506c4a367f
+      size: 33271
     - path: models/BERTopic_meta_labels.pkl
       hash: md5
-      md5: db38387a5222b3ae31948fb34460736a
-      size: 543
+      md5: 5230edeeb6b86aa8cbb5d166288a54d4
+      size: 521
     - path: models/BERTopic_topic_to_meta.pkl
       hash: md5
-      md5: 32c7960330b7b7fbba6cb5d2b76ae8b4
-      size: 7946
+      md5: 39690922330e9c53ab2c9cf597797efd
+      size: 8054
   evaluate:
-    cmd: uv run src/evaluate.py --filepath data/clusterized.csv --metrics_output
+    cmd: python src/evaluate.py --filepath data/clusterized.csv --metrics_output
       metrics/silhouette.json
     deps:
     - path: data/clusterized.csv
       hash: md5
-      md5: 05ec88615724761cf47e4ffd4cf4a212
-      size: 500050292
+      md5: aabe53cc50ba7066f85ef6c9d031bbd3
+      size: 500104419
     - path: src/evaluate.py
       hash: md5
-      md5: 8dd82415ac056129d2c163cd29103536
-      size: 4141
+      md5: 11b36974908196faf79cfa13844240fd
+      size: 4829
     outs:
     - path: metrics/silhouette.json
       hash: md5
-      md5: 0e3ef2d072e8d2d7cf40579ab3fae5c3
-      size: 46
+      md5: 8647238588ececacdef415348d9aa3f2
+      size: 47
