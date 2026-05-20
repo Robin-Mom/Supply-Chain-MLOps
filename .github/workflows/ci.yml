@@ -38,10 +38,11 @@ jobs:
       - name: Create dummy external network for Airflow
         run: docker network create airflow_default || true
 
-      # 🔐 Authentification HTTP robuste via injection du Token dans l'URL DVC
+      # 🔐 Configuration locale S3 propre pour DagsHub (évite les conflits d'URL HTTP/S3)
       - name: Pull Data and Models from DVC via Docker
         run: |
-          docker compose run --rm trainer dvc remote modify origin url https://marv1-ops:${{ secrets.DAGSHUB_CLIENT_TOKEN }}@dagshub.com/schmilblick-ai/Supply-Chain-MLOps.dvc
+          docker compose run --rm trainer dvc remote modify origin --local access_key_id "marv1-ops"
+          docker compose run --rm trainer dvc remote modify origin --local secret_access_key "${{ secrets.DAGSHUB_CLIENT_TOKEN }}"
           docker compose run --rm trainer dvc pull
 
       # On lance les tests unitaires à l'intérieur du conteneur trainer (qui a tout son environnement Python prêt)
