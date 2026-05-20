@@ -1,0 +1,5 @@
+outs:
+- md5: eb444fcb33e11785fd8b54b23bb32278
+  size: 1733
+  hash: md5
+  path: minimal_log_all-MiniLM-L6-v2.log

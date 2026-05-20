@@ -1,0 +1,6 @@
+outs:
+- md5: 3b1394955d2b2a5dfcc86e0da98a14d3.dir
+  size: 1797232
+  nfiles: 3
+  hash: md5
+  path: BERTopic_LaBSE
