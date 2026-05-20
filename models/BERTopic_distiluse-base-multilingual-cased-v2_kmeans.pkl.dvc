@@ -1,5 +1,0 @@
-outs:
-- md5: 9366a4aa58a5b16fe29fc0467ac6b90b
-  size: 22831
-  hash: md5
-  path: BERTopic_distiluse-base-multilingual-cased-v2_kmeans.pkl

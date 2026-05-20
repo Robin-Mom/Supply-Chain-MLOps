@@ -1,6 +1,0 @@
-outs:
-- md5: 26eb8163b081e62cffe3761da5283550.dir
-  size: 1412166
-  nfiles: 3
-  hash: md5
-  path: BERTopic_all-MiniLM-L6-v2

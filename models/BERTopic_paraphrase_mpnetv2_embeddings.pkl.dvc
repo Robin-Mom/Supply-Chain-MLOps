@@ -1,5 +1,0 @@
-outs:
-- md5: a1651f1bfb1c0dea20b92e406a735a24
-  size: 117538033
-  hash: md5
-  path: BERTopic_paraphrase_mpnetv2_embeddings.pkl

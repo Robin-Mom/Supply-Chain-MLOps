@@ -1,5 +1,0 @@
-outs:
-- md5: 8b7c6cb1243f06eedcf1c4e755a1d088
-  size: 17671
-  hash: md5
-  path: BERTopic_paraphrase-multilingual-MiniLM-L12-v2_kmeans.pkl
