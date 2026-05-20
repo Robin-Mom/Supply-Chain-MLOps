@@ -1,0 +1,5 @@
+outs:
+- md5: 02aa860221f3e7ce73541a3052129bcc
+  size: 7244
+  hash: md5
+  path: BERTopic_paraphrase_mpnetv2_topic_to_meta.pkl

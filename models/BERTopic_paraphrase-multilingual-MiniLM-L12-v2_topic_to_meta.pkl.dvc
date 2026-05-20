@@ -1,0 +1,5 @@
+outs:
+- md5: ad4a6f494e3cf77a9c7f6c830b84d71c
+  size: 6974
+  hash: md5
+  path: BERTopic_paraphrase-multilingual-MiniLM-L12-v2_topic_to_meta.pkl

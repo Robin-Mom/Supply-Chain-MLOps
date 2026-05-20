@@ -25,3 +25,8 @@ services:
       - .env
     # Ce container s'éteint tout seul une fois l'entraînement fini
     command: ["dvc", "repro", "--force"]
+
+# app/docker-compose.yaml — rejoindre le réseau
+networks:
+  airflow_default:
+    external: true               # réseau déjà créé par la stack Airflow

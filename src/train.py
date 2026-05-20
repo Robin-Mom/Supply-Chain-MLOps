@@ -226,6 +226,8 @@ def main(verbose, exp_name, run_name, artifact_path, filepath, sep, colname, sen
 	### @@@ MLflow @@@ Store information in tracking server
 	with mlflow.start_run(run_name=run_name) as run:
 		run_id = run.info.run_id
+		with open("models/last_run_id.txt", "w", encoding="utf-8") as f:
+			f.write(run_id)
 		mlflow.log_params({
 			"sentence_transformer": sentenceTransformer,
 			"n_clusters": n_clusters,

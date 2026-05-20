@@ -1,0 +1,5 @@
+outs:
+- md5: e088cdb2bac1459acd31be4fff285d6a
+  size: 225832218
+  hash: md5
+  path: clusterized_paraphrase-multilingual-MiniLM-L12-v2

@@ -1,0 +1,5 @@
+outs:
+- md5: 9735fd6802cd8bdc3f5563c8fa3dfffd
+  size: 617
+  hash: md5
+  path: BERTopic_all-MiniLM-L6-v2_meta_labels.pkl
