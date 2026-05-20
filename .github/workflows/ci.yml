@@ -16,6 +16,8 @@ jobs:
       MLFLOW_TRACKING_PASSWORD: ${{ secrets.MLFLOW_TRACKING_PASSWORD }}
       # On ajoute le token DagsHub pour éviter le blocage de l'authentification interactive
       DAGSHUB_CLIENT_TOKEN: ${{ secrets.DAGSHUB_CLIENT_TOKEN }}
+      AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
+      AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
 
     steps:
       - name: Checkout code
@@ -35,8 +37,16 @@ jobs:
         run: uv python install 3.12
 
       - name: Install dependencies
-        run: uv sync --all-groups
+        run: |
+          uv sync --all-groups
+          # On s'assure d'installer l'extension S3 pour DVC sur la CI
+          uv pip install "dvc[s3]" dagshub
 
+      - name: Pull Data and Models from DVC
+        run: |
+          # La CI télécharge les artefacts requis pour valider les tests
+          uv run dvc pull
+      
       - name: Run unit tests
         run: |
           uv run pytest
