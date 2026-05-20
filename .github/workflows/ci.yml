@@ -14,6 +14,15 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
 
+      # 🧹 ÉTAPE DE NETTOYAGE DU DISQUE (Indispensable pour les gros conteneurs ML)
+      - name: Free Disk Space (Ubuntu Runner)
+        run: |
+          sudo rm -rf /usr/share/dotnet
+          sudo rm -rf /usr/local/lib/android
+          sudo rm -rf /opt/ghc
+          sudo rm -rf "/usr/local/share/boost"
+          sudo rm -rf /usr/lib/jvm
+
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
 
@@ -29,10 +38,9 @@ jobs:
       - name: Create dummy external network for Airflow
         run: docker network create airflow_default || true
 
-      # On configure l'authentification DVC via ton conteneur trainer
+      # On configure l'authentification DVC via ton conteneur trainer (version universelle)
       - name: Pull Data and Models from DVC via Docker
         run: |
-          docker compose run --rm trainer dvc remote modify origin --local auth token
           docker compose run --rm trainer dvc remote modify origin --local user marv1-ops
           docker compose run --rm trainer dvc remote modify origin --local password ${{ secrets.DAGSHUB_CLIENT_TOKEN }}
           docker compose run --rm trainer dvc pull
