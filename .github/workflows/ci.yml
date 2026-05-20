@@ -38,17 +38,17 @@ jobs:
       - name: Create dummy external network for Airflow
         run: docker network create airflow_default || true
 
-      # 🔐 Nettoyage du remote et pull dans un SEUL et même conteneur (Infaillible)
+      # 🔐 Configuration et pull explicite (via -r origin)
       - name: Pull Data and Models from DVC via Docker
         run: |
           docker compose run --rm \
             -e DAGSHUB_TOKEN="${{ secrets.DAGSHUB_CLIENT_TOKEN }}" \
             trainer sh -c "
-              dvc remote remove origin && \
+              dvc remote remove origin || true && \
               dvc remote add origin https://dagshub.com/schmilblick-ai/Supply-Chain-MLOps.dvc && \
               dvc remote modify origin --local user marv1-ops && \
               dvc remote modify origin --local password \$DAGSHUB_TOKEN && \
-              dvc pull
+              dvc pull -r origin
             "
 
       # On lance les tests unitaires à l'intérieur du conteneur trainer (qui a tout son environnement Python prêt)
