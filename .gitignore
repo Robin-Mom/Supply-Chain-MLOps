@@ -32,3 +32,8 @@ models/*
 
 # Logs du pipeline (On ne les push pas sur Git)
 logs/
+
+# --- DVC LOCAL CONFIGURATION (SÉCURITÉ) ---
+.dvc/config.local
+.dvc/cache/
+.dvc/tmp/
