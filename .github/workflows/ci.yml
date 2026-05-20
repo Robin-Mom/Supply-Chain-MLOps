@@ -1,0 +1,53 @@
+name: Supply Chain MLOps CI
+
+on:
+  push:
+    branches: [ main, feat/ci-pipeline ]
+  pull_request:
+    branches: [ main ]
+
+jobs:
+  ci-pipeline:
+    runs-on: ubuntu-latest
+    
+    env:
+      MLFLOW_TRACKING_URI: "https://dagshub.com/schmilblick-ai/Supply-Chain-MLOps.mlflow"
+      MLFLOW_TRACKING_USERNAME: "marv1-ops"
+      MLFLOW_TRACKING_PASSWORD: ${{ secrets.MLFLOW_TRACKING_PASSWORD }}
+      # On ajoute le token DagsHub pour éviter le blocage de l'authentification interactive
+      DAGSHUB_CLIENT_TOKEN: ${{ secrets.DAGSHUB_CLIENT_TOKEN }}
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Setup uv
+        uses: astral-sh/setup-uv@v5
+        with:
+          version: "latest"
+          enable-cache: true
+          cache-dependency-glob: "uv.lock"
+
+      - name: Set up Python
+        run: uv python install 3.12
+
+      - name: Install dependencies
+        run: uv sync --all-groups
+
+      - name: Run unit tests
+        run: |
+          uv run pytest
+
+      - name: Build Docker image
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          # FIX: On pointe vers le nouveau chemin de ton Dockerfile API
+          file: ./docker/api.Dockerfile 
+          tags: supply-chain-mlops-api:test
+          push: false
+          cache-from: type=gha
+          cache-to: type=gha,mode=max

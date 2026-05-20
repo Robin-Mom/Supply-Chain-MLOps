@@ -1,6 +1,6 @@
 stages:
   preprocess:
-    cmd: uv run src/preprocess.py
+    cmd: python src/preprocess.py
     deps:
       - src/preprocess.py
       - data/avis_40k.csv
@@ -8,7 +8,7 @@ stages:
       - data/avis_cleaned.csv
 
   nlp_simple:
-    cmd: uv run src/preprocess_nlp.py
+    cmd: python src/preprocess_nlp.py
     deps:
       - src/preprocess_nlp.py
       - data/avis_cleaned.csv
@@ -16,7 +16,7 @@ stages:
       - data/avis_nlp.csv
 
   spacy_lemmatization:
-    cmd: uv run src/preprocess_spacy.py
+    cmd: python src/preprocess_spacy.py
     deps:
       - src/preprocess_spacy.py
       - data/avis_cleaned.csv
@@ -24,21 +24,20 @@ stages:
       - data/avis_bertopic.csv
 
   train:
-      cmd: uv run src/train.py --filepath data/avis_bertopic.csv --model_output models/BERTopic
-      deps:
-        - src/train.py
-        - data/avis_bertopic.csv
-      outs:
-        - models/BERTopic
-        - models/BERTopic_kmeans.pkl
-        - models/BERTopic_meta_labels.pkl
-        - models/BERTopic_topic_to_meta.pkl
-        - models/BERTopic_embeddings.pkl
-        - data/clusterized.csv
+    cmd: python src/train.py --filepath data/avis_bertopic.csv --model_output models/BERTopic
+    deps:
+      - src/train.py
+      - data/avis_bertopic.csv
+    outs:
+      - models/BERTopic
+      - models/BERTopic_kmeans.pkl
+      - models/BERTopic_meta_labels.pkl
+      - models/BERTopic_topic_to_meta.pkl
+      - models/BERTopic_embeddings.pkl
+      - data/clusterized.csv
   
   evaluate:
-    cmd: uv run src/evaluate.py --filepath data/clusterized.csv --metrics_output metrics/silhouette.json
-    deps:
+    cmd: python src/evaluate.py --filepath data/clusterized.csv --metrics_output metrics/silhouette.json
       - src/evaluate.py
       - data/clusterized.csv
     metrics:
