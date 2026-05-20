@@ -1,0 +1,6 @@
+outs:
+- md5: 62223aa2876061af0b11235f917a6e69.dir
+  size: 1885929
+  nfiles: 3
+  hash: md5
+  path: BERTopic_paraphrase_mpnetv2

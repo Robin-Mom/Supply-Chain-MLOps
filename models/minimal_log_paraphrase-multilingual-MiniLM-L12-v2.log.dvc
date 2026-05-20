@@ -1,0 +1,5 @@
+outs:
+- md5: 0b74479e1516a0a92a359f53930fe1f1
+  size: 1646
+  hash: md5
+  path: minimal_log_paraphrase-multilingual-MiniLM-L12-v2.log
