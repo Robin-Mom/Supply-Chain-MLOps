@@ -38,7 +38,7 @@ jobs:
       - name: Create dummy external network for Airflow
         run: docker network create airflow_default || true
 
-      # 🔐 Nettoyage du remote et pull dans un SEUL et même conteneur
+      # 🔐 Nettoyage du remote et pull dans un SEUL et même conteneur (Infaillible)
       - name: Pull Data and Models from DVC via Docker
         run: |
           docker compose run --rm \
