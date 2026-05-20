@@ -2,19 +2,13 @@ name: Supply Chain MLOps CI
 
 on:
   push:
-    branches: [ main ]
+    branches: [ main, feat/ci-pipeline ]
   pull_request:
     branches: [ main ]
 
 jobs:
   ci-pipeline:
     runs-on: ubuntu-latest
-    
-    env:
-      MLFLOW_TRACKING_URI: "https://dagshub.com/schmilblick-ai/Supply-Chain-MLOps.mlflow"
-      MLFLOW_TRACKING_USERNAME: "marv1-ops"
-      MLFLOW_TRACKING_PASSWORD: ${{ secrets.MLFLOW_TRACKING_PASSWORD }}
-      DAGSHUB_CLIENT_TOKEN: ${{ secrets.DAGSHUB_CLIENT_TOKEN }}
 
     steps:
       - name: Checkout code
@@ -23,42 +17,32 @@ jobs:
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
 
-      - name: Setup uv
-        uses: astral-sh/setup-uv@v5
-        with:
-          version: "latest"
-          enable-cache: true
-          cache-dependency-glob: "uv.lock"
-
-      - name: Set up Python
-        run: uv python install 3.12
-
-      - name: Install dependencies
+      # Étape cruciale : On crée le fichier .env que tes conteneurs attendent (env_file)
+      - name: Create .env file for Docker Compose
         run: |
-          uv sync --all-groups
-          # On installe dagshub pour s'assurer que les drivers HTTP/DVC sont présents
-          uv pip install dagshub
+          echo "MLFLOW_TRACKING_URI=https://dagshub.com/schmilblick-ai/Supply-Chain-MLOps.mlflow" >> .env
+          echo "MLFLOW_TRACKING_USERNAME=marv1-ops" >> .env
+          echo "MLFLOW_TRACKING_PASSWORD=${{ secrets.MLFLOW_TRACKING_PASSWORD }}" >> .env
+          echo "DAGSHUB_CLIENT_TOKEN=${{ secrets.DAGSHUB_CLIENT_TOKEN }}" >> .env
 
-      - name: Pull Data and Models from DVC
+      # Optionnel mais évite les crashs si le réseau externe d'Airflow n'existe pas sur la CI
+      - name: Create dummy external network for Airflow
+        run: docker network create airflow_default || true
+
+      # On configure l'authentification DVC via ton conteneur trainer
+      - name: Pull Data and Models from DVC via Docker
         run: |
-          # Configuration dynamique du remote pour utiliser le token DagsHub pur
-          uv run dvc remote modify origin --local auth token
-          uv run dvc remote modify origin --local user marv1-ops
-          uv run dvc remote modify origin --local password ${{ secrets.DAGSHUB_CLIENT_TOKEN }}
-          
-          # Téléchargement sécurisé des artefacts pour les tests unitaires
-          uv run dvc pull
+          docker compose run --rm trainer dvc remote modify origin --local auth token
+          docker compose run --rm trainer dvc remote modify origin --local user marv1-ops
+          docker compose run --rm trainer dvc remote modify origin --local password ${{ secrets.DAGSHUB_CLIENT_TOKEN }}
+          docker compose run --rm trainer dvc pull
 
-      - name: Run unit tests
+      # On lance les tests unitaires à l'intérieur du conteneur trainer (qui a tout son environnement Python prêt)
+      - name: Run unit tests via Docker
         run: |
-          uv run pytest
+          docker compose run --rm trainer pytest tests/
 
-      - name: Build Docker image
-        uses: docker/build-push-action@v6
-        with:
-          context: .
-          file: ./docker/api.Dockerfile 
-          tags: supply-chain-mlops-api:test
-          push: false
-          cache-from: type=gha
-          cache-to: type=gha,mode=max
+      # On valide le build de l'image de production/inférence de ton API
+      - name: Build API Docker image
+        run: |
+          docker compose build api
