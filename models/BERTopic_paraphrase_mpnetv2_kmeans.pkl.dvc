@@ -1,5 +1,0 @@
-outs:
-- md5: 91ecd18e9e87c70e8f56ad4dc120714f
-  size: 33091
-  hash: md5
-  path: BERTopic_paraphrase_mpnetv2_kmeans.pkl

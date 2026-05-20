@@ -1,5 +1,0 @@
-outs:
-- md5: 3c39ef0f601afd18e7e63c86ecc00200
-  size: 8450
-  hash: md5
-  path: BERTopic_all-MiniLM-L6-v2_topic_to_meta.pkl

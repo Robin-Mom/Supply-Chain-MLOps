@@ -1,5 +1,0 @@
-outs:
-- md5: dd6b1eba0aeac08bd93000f255d90e34
-  size: 1627
-  hash: md5
-  path: minimal_log_distiluse-base-multilingual-cased-v2.log

@@ -1,6 +1,0 @@
-outs:
-- md5: c27f3d2461292001de2b5d21e8b07571.dir
-  size: 1219245
-  nfiles: 3
-  hash: md5
-  path: BERTopic_paraphrase-multilingual-MiniLM-L12-v2

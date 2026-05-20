@@ -1,5 +1,0 @@
-outs:
-- md5: 62c818cc9ddf89aa951be1f810738933
-  size: 117538033
-  hash: md5
-  path: BERTopic_LaBSE_embeddings.pkl

@@ -1,5 +1,0 @@
-outs:
-- md5: 0630c4d80da1b03e0feb1bb3d64cf77d
-  size: 32999
-  hash: md5
-  path: BERTopic_LaBSE_kmeans.pkl
