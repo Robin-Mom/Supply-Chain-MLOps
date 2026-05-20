@@ -38,13 +38,13 @@ jobs:
       - name: Create dummy external network for Airflow
         run: docker network create airflow_default || true
 
-      # 🔐 Injection globale des credentials AWS S3 pour DagsHub
+      # 🔐 Injection forcée des credentials AWS S3 à l'intérieur du conteneur Docker
       - name: Pull Data and Models from DVC via Docker
-        env:
-          AWS_ACCESS_KEY_ID: "marv1-ops"
-          AWS_SECRET_ACCESS_KEY: ${{ secrets.DAGSHUB_CLIENT_TOKEN }}
         run: |
-          docker compose run --rm trainer dvc pull
+          docker compose run --rm \
+            -e AWS_ACCESS_KEY_ID="marv1-ops" \
+            -e AWS_SECRET_ACCESS_KEY="${{ secrets.DAGSHUB_CLIENT_TOKEN }}" \
+            trainer dvc pull
 
       # On lance les tests unitaires à l'intérieur du conteneur trainer (qui a tout son environnement Python prêt)
       - name: Run unit tests via Docker
