@@ -38,8 +38,8 @@ stages:
   
   evaluate:
     cmd: python src/evaluate.py --filepath data/clusterized.csv --metrics_output metrics/silhouette.json
+    deps:
       - src/evaluate.py
       - data/clusterized.csv
     metrics:
-      - metrics/silhouette.json:
-          cache: false
+      - metrics/silhouette.json
