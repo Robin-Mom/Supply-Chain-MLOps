@@ -1,0 +1,5 @@
+outs:
+- md5: 52b756e0e606527cd5de827df9e99281
+  size: 58769137
+  hash: md5
+  path: BERTopic_all-MiniLM-L6-v2_embeddings.pkl

@@ -1,0 +1,6 @@
+outs:
+- md5: 697ac303d3d7ac9a893fe68a479fa3c8.dir
+  size: 1451011
+  nfiles: 3
+  hash: md5
+  path: BERTopic_distiluse-base-multilingual-cased-v2
