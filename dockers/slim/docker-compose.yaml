@@ -1,0 +1,32 @@
+services:
+  # Service 1 : L'API (Inférence) Oscaro Trust Pilot
+  api:
+    build:
+      context: .
+      dockerfile: Dockerfile  # On peut avoir un Dockerfile spécifique pour l'API
+    ports:
+      - "8000:8000"
+    volumes:
+      - .:/app  # Permet de voir les modifs de code en temps réel (développement)
+      - /app/.venv
+    env_file:
+      - .env  # On va mettre tes identifiants DagsHub ici pour la sécurité
+    # On s'assure que l'API ne se lance que si les modèles sont là
+    command: ["uvicorn", "src.api:app", "--host", "0.0.0.0", "--port", "8000"]
+  
+  # Service 2 : Le Trainer (Cycle de vie ML)
+  trainer:
+    build:
+      context: .
+      dockerfile: Dockerfile  # Un Dockerfile spécifique pour le trainer
+    volumes:
+      - .:/app
+    env_file:
+      - .env
+    # Ce container s'éteint tout seul une fois l'entraînement fini
+    command: ["dvc", "repro", "--force"]
+
+# app/docker-compose.yaml — rejoindre le réseau
+networks:
+  airflow_default:
+    external: true               # réseau déjà créé par la stack Airflow
