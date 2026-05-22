@@ -2,32 +2,74 @@
 # -*- coding: utf-8 -*-
 
 import argparse
+import json
 import logging as log
+import os
 import joblib
-from sentence_transformers import SentenceTransformer
+import dagshub
+import mlflow
 
-def predict(text, model_path, st_model_name):
-    # -------------------------
-    # 1. Load modèles
-    # -------------------------
-    kmeans = joblib.load(model_path + "_kmeans.pkl")
-    meta_labels = joblib.load(model_path + "_meta_labels.pkl")
-    log.info(f"loaded kmeans and meta_labels from {model_path}")
-    embedding_model = SentenceTransformer(st_model_name)
-    log.info(f"loaded SentenceTransformer model: {st_model_name} for embeddings computation.")
-    # -------------------------
-    # 2. Embedding
-    # -------------------------
+from sentence_transformers import SentenceTransformer
+from mlflow.tracking import MlflowClient
+
+
+def load_production_model(model_name):
+
+    client = MlflowClient()
+
+    versions = client.get_latest_versions(
+        model_name,
+        stages=["Production"]
+    )
+
+    if len(versions) == 0:
+        raise ValueError(
+            f"No Production model found for {model_name}"
+        )
+
+    model_uri = versions[0].source
+
+    local_path = mlflow.artifacts.download_artifacts(
+        artifact_uri=model_uri
+    )
+
+    return local_path
+
+
+def predict(text, model_name):
+
+    dagshub.init(
+        repo_owner='schmilblick-ai',
+        repo_name='Supply-Chain-MLOps',
+        mlflow=True
+    )
+
+    model_path = load_production_model(model_name)
+
+    with open(
+        os.path.join(model_path, "config.json"),
+        "r"
+    ) as f:
+        config = json.load(f)
+
+    st_model_name = config["sentence_transformer"]
+
+    kmeans = joblib.load(
+        os.path.join(model_path, "kmeans.pkl")
+    )
+
+    meta_labels = joblib.load(
+        os.path.join(model_path, "meta_labels.pkl")
+    )
+
+    embedding_model = SentenceTransformer(
+        st_model_name, device='cpu'
+    )
+
     embedding = embedding_model.encode([text])
 
-    # -------------------------
-    # 3. Meta-clustering direct
-    # -------------------------
     meta_topic = kmeans.predict(embedding)[0]
 
-    # -------------------------
-    # 4. Label
-    # -------------------------
     if meta_topic in meta_labels:
         label = " | ".join(meta_labels[meta_topic])
     else:
@@ -41,27 +83,43 @@ def predict(text, model_path, st_model_name):
 
 
 def _cli():
-    parser = argparse.ArgumentParser(
-            description=__doc__,
-            formatter_class=argparse.ArgumentDefaultsHelpFormatter,
-            argument_default=argparse.SUPPRESS)
-    parser.add_argument('-v', '--verbose', action='store_true', default=False, help="Boolean: activate verbose mode. Default is no verbose.")
-    parser.add_argument("-t", "--text", type=str, required=True, help="input text for wich you want to assign cluster.")
-    parser.add_argument("-m", "--model", type=str, default="models/BERTopic", help="path to model you want to use for predict")
-    parser.add_argument("--st", type=str, default="paraphrase-multilingual-mpnet-base-v2", help="name of sentence Transformer used to generate initial embeddings. Beware of using the sampe as for train.py")
+
+    parser = argparse.ArgumentParser()
+
+    parser.add_argument(
+        "-t",
+        "--text",
+        required=True
+    )
+
+    parser.add_argument(
+        "-mn",
+        "--model_name",
+        default="trustpilot_bertopic"
+    )
+
+    parser.add_argument(
+        "-v",
+        "--verbose",
+        action="store_true"
+    )
 
     args = parser.parse_args()
-    
-    if args.verbose == True :
-        log.basicConfig(format="%(levelname)s: %(message)s", level=log.DEBUG)
-        log.info("Verbose output.")
-    else:
-        log.basicConfig(format="%(levelname)s: %(message)s")
+
+    if args.verbose:
+        log.basicConfig(level=log.INFO)
 
     return vars(args)
 
 
 if __name__ == "__main__":
+
     args = _cli()
-    result = predict(args["text"], args["model"], args["st"])
+
+    result = predict(
+        args["text"],
+        args["model_name"]
+    )
+
     print(result)
+
