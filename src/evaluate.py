@@ -109,6 +109,12 @@ def main(
             log.info(
                 f"New best model registered: {score}"
             )
+            with open("metrics/best_score.json", "w") as f:
+                json.dump(
+                    {"silhouette_score": float(score)},
+                    f,
+                    indent=4
+                )
 # si non, le modèle n'est pas enregistré
         else:
 
@@ -168,13 +174,13 @@ def _cli():
     parser.add_argument(
         "-en",
         "--experiment_name",
-        default="Bertopic_Trustpilot"
+        default="Bertopic_Trustpilot_v2"
     )
 
     parser.add_argument(
         "-mn",
         "--model_name",
-        default="trustpilot_bertopic"
+        default="trustpilot_bertopic_v2"
     )
 
     parser.add_argument(

@@ -20,9 +20,9 @@ from mlflow.tracking import MlflowClient
 # CONFIGURATION
 # ---------------------------------------------------------
 
-MODEL_NAME = "trustpilot_bertopic"
+MODEL_NAME = "trustpilot_bertopic_v2"
 
-METRICS_PATH = "metrics/silhouette.json"
+METRICS_PATH = "metrics/best_score.json"
 
 app = FastAPI(
     title="Oscaro Trustpilot API",

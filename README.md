@@ -43,7 +43,7 @@ Avant de lancer l'infrastructure, récupérez le code et les fichiers lourds :
     dvc pull
 4. précautions supplémentaires pour éviter les bugs avec docker-compose v1 avant de lancer le build:
 
-    docker compose down --volumes --remove-orphans
+    docker-compose down --volumes --remove-orphans
     docker system prune -af
 
 ## 🏗️ Étapes Globales du Pipeline
