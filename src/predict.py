@@ -95,7 +95,7 @@ def _cli():
     parser.add_argument(
         "-mn",
         "--model_name",
-        default="trustpilot_bertopic"
+        default="trustpilot_bertopic_v2"
     )
 
     parser.add_argument(

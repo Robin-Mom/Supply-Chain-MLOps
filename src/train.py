@@ -4,6 +4,7 @@
 import argparse
 import logging as log
 import os
+import shutil
 import json
 import joblib
 import dagshub
@@ -260,7 +261,7 @@ def _cli():
     parser.add_argument(
         "-en",
         "--exp_name",
-        default="Bertopic_Trustpilot"
+        default="Bertopic_Trustpilot_v2"
     )
 
     parser.add_argument(
