@@ -174,13 +174,13 @@ def _cli():
     parser.add_argument(
         "-en",
         "--experiment_name",
-        default="Bertopic_Trustpilot_v2"
+        default="Bertopic_Trustpilot_v4"
     )
 
     parser.add_argument(
         "-mn",
         "--model_name",
-        default="trustpilot_bertopic_v2"
+        default="trustpilot_bertopic_v4"
     )
 
     parser.add_argument(
