@@ -1,10 +1,11 @@
 # Docker after PR STARTUP
 
 TL;TR
+```
 docker-compose build --no-cache api
 docker-compose down
 docker-compose up api
-
+```
 
 # le vrai clean pour repartir de zéro
 
