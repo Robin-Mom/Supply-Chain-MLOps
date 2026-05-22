@@ -35,7 +35,6 @@ def main(
     verbose,
     exp_name,
     run_name,
-    artifact_path,
     filepath,
     sep,
     colname,
@@ -246,7 +245,7 @@ def main(
 
         mlflow.log_artifacts(
             artifacts_dir,
-            artifact_path=artifact_path
+            artifact_path=artifacts_dir
         )
 
     write_log("Training complete")
@@ -261,19 +260,13 @@ def _cli():
     parser.add_argument(
         "-en",
         "--exp_name",
-        default="Bertopic_Trustpilot_v2"
+        default="Bertopic_Trustpilot_v4"
     )
 
     parser.add_argument(
         "-rn",
         "--run_name",
         default="first_run"
-    )
-
-    parser.add_argument(
-        "-ap",
-        "--artifact_path",
-        default="model"
     )
 
     parser.add_argument(

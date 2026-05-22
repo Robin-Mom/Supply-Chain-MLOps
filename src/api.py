@@ -20,7 +20,7 @@ from mlflow.tracking import MlflowClient
 # CONFIGURATION
 # ---------------------------------------------------------
 
-MODEL_NAME = "trustpilot_bertopic_v2"
+MODEL_NAME = "trustpilot_bertopic_v4"
 
 METRICS_PATH = "metrics/best_score.json"
 

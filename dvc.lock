@@ -57,13 +57,13 @@ stages:
       size: 24591821
     - path: src/train.py
       hash: md5
-      md5: 14b2099afcb2da0c4ef14b3737be9f81
-      size: 6956
+      md5: 29a23adcd2103f38acf35dd40274116e
+      size: 6839
     outs:
     - path: models/c5/artifacts
       hash: md5
-      md5: 1718661e37a7834050455b114cc8fe37.dir
-      size: 298526835
+      md5: 5c0e76a42e7185ec46ae260dceced402.dir
+      size: 298520179
       nfiles: 9
   train@c10:
     cmd: python src/train.py -v -nc 10 -o models/c10
@@ -74,13 +74,13 @@ stages:
       size: 24591821
     - path: src/train.py
       hash: md5
-      md5: 14b2099afcb2da0c4ef14b3737be9f81
-      size: 6956
+      md5: 29a23adcd2103f38acf35dd40274116e
+      size: 6839
     outs:
     - path: models/c10/artifacts
       hash: md5
-      md5: e6085b528e7234965d45a27c115cd672.dir
-      size: 298515490
+      md5: 5bfffbf2be4f20387f4921811c02642b.dir
+      size: 298465434
       nfiles: 9
   train@c15:
     cmd: python src/train.py -v -nc 15 -o models/c15
@@ -91,13 +91,13 @@ stages:
       size: 24591821
     - path: src/train.py
       hash: md5
-      md5: 14b2099afcb2da0c4ef14b3737be9f81
-      size: 6956
+      md5: 29a23adcd2103f38acf35dd40274116e
+      size: 6839
     outs:
     - path: models/c15/artifacts
       hash: md5
-      md5: 202ede03d03fefe71255b28c423fa931.dir
-      size: 298513324
+      md5: 3ab5c7f16a337fa9a2480925b8607837.dir
+      size: 298565332
       nfiles: 9
   evaluate@c5:
     cmd: python src/evaluate.py -v -f models/c5/artifacts/clusterized.csv -ri 
@@ -106,20 +106,20 @@ stages:
     deps:
     - path: models/c5/artifacts/clusterized.csv
       hash: md5
-      md5: b47356a086bb85d1078af5c5491044ce
-      size: 235866539
+      md5: d9c61dd879c91fdb643310a010dee734
+      size: 235876305
     - path: models/c5/last_run_id.txt
       hash: md5
-      md5: e5168c98c5875786003a455ff022cb34
+      md5: 1d66f53f92651549dd80ce05cd82472e
       size: 32
     - path: src/evaluate.py
       hash: md5
-      md5: f7835adf0a0ea1a4548f7e8f6188ed43
+      md5: f49996fdae6f5d4e566b9f33404321ae
       size: 5163
     outs:
     - path: metrics/c5/silhouette.json
       hash: md5
-      md5: b7fb7cda1853007d63a05bea573805d7
+      md5: 6fedd64d9958acdc62341ae5ba958c6e
       size: 47
   evaluate@c10:
     cmd: python src/evaluate.py -v -f models/c10/artifacts/clusterized.csv -ri 
@@ -128,20 +128,20 @@ stages:
     deps:
     - path: models/c10/artifacts/clusterized.csv
       hash: md5
-      md5: 022fec1af13c0ed886d4603023dcd55a
-      size: 235861870
+      md5: b6e3e30b575fc53132cb227e80c103ff
+      size: 235824481
     - path: models/c10/last_run_id.txt
       hash: md5
-      md5: 5c78f7a35ec945bed3a99e587b727156
+      md5: 6b97172b8b0739fb8e07490f804f4695
       size: 32
     - path: src/evaluate.py
       hash: md5
-      md5: f7835adf0a0ea1a4548f7e8f6188ed43
+      md5: f49996fdae6f5d4e566b9f33404321ae
       size: 5163
     outs:
     - path: metrics/c10/silhouette.json
       hash: md5
-      md5: 764aac5f7a9d8b5d89ba680645e2a8b9
+      md5: 86a3fbc99cfd794eb8d2d91de5d1d15b
       size: 48
   evaluate@c15:
     cmd: python src/evaluate.py -v -f models/c15/artifacts/clusterized.csv -ri 
@@ -150,18 +150,18 @@ stages:
     deps:
     - path: models/c15/artifacts/clusterized.csv
       hash: md5
-      md5: 25ba237f1b379428083eef42582e3124
-      size: 235794646
+      md5: 8860cf9c727051b77cf2ac2395fa02ab
+      size: 235866903
     - path: models/c15/last_run_id.txt
       hash: md5
-      md5: 71b8e0b4099fef0b2cf8532c70a52751
+      md5: afbfa7beadb122706edd9b3f729b5943
       size: 32
     - path: src/evaluate.py
       hash: md5
-      md5: f7835adf0a0ea1a4548f7e8f6188ed43
+      md5: f49996fdae6f5d4e566b9f33404321ae
       size: 5163
     outs:
     - path: metrics/c15/silhouette.json
       hash: md5
-      md5: 36d93de8fc5a25715c2afdf1694db653
-      size: 48
+      md5: 164a271488e1a2b8e5e6fdc49fe3677f
+      size: 47
