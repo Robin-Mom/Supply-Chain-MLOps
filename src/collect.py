@@ -9,6 +9,9 @@ import csv
 import logging
 import os
 
+from pathlib import Path
+import datetime as dt
+import yaml
 
 def fetch_truspilot_reviews(site="www.oscaro.com",nb_pages=5):
     base_url = f"https://fr.trustpilot.com/review/{site}"
@@ -463,12 +466,10 @@ def testing():
 ######################################################################
 ####### only preparing local data fetch with proper calendar
 
-
-import pandas as pd
-from pathlib import Path
-import csv
-import datetime as dt
-import yaml
+def getYmlParams(paramFile="params.yaml"):
+    with open(paramFile) as f:
+        params = yaml.safe_load(f)
+    return(params)
 
 def get_calendar():
     #this calendar is providing date with hours depending on the time we run the function - so bad
@@ -508,13 +509,17 @@ def get_periods(StartDay=None,EndDay=None,NbPer=None):
     return lstPer
 
 #ASSEMBLAGE AVIS UNIQUE
-def get_avis(avisSrc):
-    avisF = Path(f"../data/{avisSrc}.csv")
+def get_avis(avisSrc,tgtfld="./data"):
+    avisF = Path(f"{tgtfld}/{avisSrc}.csv")
     if avisF.exists():
         return pd.read_csv(avisF,sep=";")
 
-def merge_avis(set1="avis_40k",set2="avis_28k", tgtset="avis_45k"):
-    df=pd.concat([get_avis(set1),get_avis(set2)])
+def merge_avis(paramFile="params.yaml",tgtfld="./data"):    
+    pm=getYmlParams(paramFile)["mergeInc"]
+    set1,set2,tgtset=pm["source"], pm["increm"], pm["output"]
+
+    print(set1,set2,tgtset,tgtfld,get_avis(set1,tgtfld=tgtfld))
+    df=pd.concat([get_avis(set1,tgtfld=tgtfld),get_avis(set2,tgtfld=tgtfld)])
 
     nodupkeys=["auteur","note","titre","commentaire","date_experience","texteServiceReply","dateServiceReply","dataServiceReply"]
     df = df.drop(columns=["url"])
@@ -523,7 +528,7 @@ def merge_avis(set1="avis_40k",set2="avis_28k", tgtset="avis_45k"):
     #display(df.head())
 
     df.info(memory_usage="deep")
-    tgtAvis=Path(f"../data/{tgtset}.csv")
+    tgtAvis=Path(f"{tgtfld}/{tgtset}.csv")
     df.to_csv(tgtAvis, index=None,sep=";",quoting=csv.QUOTE_ALL)
 
 def get_reviews(reviewSrc="avis_45k", arrPeriods=[], mode="bulk"):
@@ -560,19 +565,14 @@ def get_reviews(reviewSrc="avis_45k", arrPeriods=[], mode="bulk"):
             return df[ df.Period.between(arrPeriods[0],arrPeriods[-1]) ]
         else:
             return df[ df.Period.isin(arrPeriods) ]
-        
+
+
 #main section for dvc runs with the params.yaml
 if __name__ == "__main__":
 
     #from params.yaml
-    
-    with open("params.yaml") as f:
-        params = yaml.safe_load(f)
-
-    mode = params["collect"]["mode"]
-    source = params["collect"]["source"]
-    period_start = params["collect"]["period_start"]
-    period_end = params["collect"]["period_end"]
+    pc=getYmlParams("params.yaml")["collect"]
+    mode ,source,period_start,period_end = pc["mode"],pc["source"],pc["period_start"],pc["period_end"]
 
     # collecte le batch demandé
     df_new = get_reviews(reviewSrc=source,period=[period_start, period_end], mode=mode)

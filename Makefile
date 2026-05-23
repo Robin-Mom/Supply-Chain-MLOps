@@ -20,7 +20,7 @@ export AIRFLOW_GID := 0
 
 # ── Phony ─────────────────────────────────────────────────────
 #target not to take for files but command lines are liste in the .PHONY statement
-.PHONY: help secrets airflow_init airflow_prepdocker_sock airflow_up airflow_force_recreate airflow_down airflow_reset airflow_ps up down slmbuild slmbuild-cpu slmbuild-gpu slmbuild-test
+.PHONY: help secrets airflow_init airflow_prepdocker_sock airflow_up airflow_force_recreate airflow_down airflow_reset airflow_ps dvc_repro dvc_push up down slmbuild slmbuild-cpu slmbuild-gpu slmbuild-test
 
 # ── Help ──────────────────────────────────────────────────────
 help: ## this help
@@ -57,6 +57,17 @@ airflow_reset:
 
 airflow_ps:  ## list process runnings $(DOCKER_COMPOSE) -f airflow/docker-compose.yaml ps
 	$(DOCKER_COMPOSE) -f dockers/airflow/docker-compose.yaml ps
+
+# ── dvc ────────────────────────────────────────────────────
+dvc-repro:
+	dvc repro --force
+
+dvc-push: ## on push sauf si la config
+	dvc push
+	git add dvc.lock
+	git commit -m "update pipeline"
+	git push
+
 
 # ── Global ────────────────────────────────────────────────────
 # GLOBAL SECTION mixte airflow et le docker-compose standard et a venir nginx
