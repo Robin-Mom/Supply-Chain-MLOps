@@ -103,3 +103,27 @@ stages:
       hash: md5
       md5: 8647238588ececacdef415348d9aa3f2
       size: 47
+  mergInc:
+    cmd: python -c "from src.collect import merge_avis; merge_avis()"
+    deps:
+    - path: data/avis_28k.csv
+      hash: md5
+      md5: 91468bdcba366b4574ec554396cfb301
+      size: 16240466
+    - path: data/avis_40k.csv
+      hash: md5
+      md5: a37a97783209add4600b46b82faeb88b
+      size: 21331918
+    - path: params.yaml
+      hash: md5
+      md5: 6a13b68380507857c6c2243267eb7fcb
+      size: 344
+    - path: src/collect.py
+      hash: md5
+      md5: e5466e051aec926356e227676cf83e55
+      size: 36411
+    outs:
+    - path: data/avis_45k.csv
+      hash: md5
+      md5: b6cc45941923d649252e393343cb2ff0
+      size: 21698577
