@@ -1,4 +1,15 @@
 stages:
+
+  collect:
+    cmd: python src/collect.py
+    deps:
+      - params.yaml
+      - src/preprocess.py
+      - data/avis_40k.csv
+      - data/avis_28k.csv
+    outs:
+      - data/avis_45k.csv
+
   preprocess:
     cmd: python src/preprocess.py
     deps:
