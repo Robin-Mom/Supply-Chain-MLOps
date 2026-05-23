@@ -65,13 +65,15 @@ airflow_ps:  ## list process runnings $(DOCKER_COMPOSE) -f airflow/docker-compos
 # Fichier GÉNÉRÉ   →  dvc.lock     (dvc repro)
 # Si les deux existent pour le même fichier → PROBLÈME
 
-dvc-mergeInc:
-
+FORCE ?= 0
+dvc-mergeInc:  ## merge a set with incremental overlapping 40K ith 28k
+	@echo "--- dvc merge incremental force=$(FORCE)" #" $(if $(filter 1,$(FORCE)),--force,)"
+	dvc repro --downstream mergInc $(if $(filter 1,$(FORCE)),--force,)
 
 dvc-repro:
-	dvc repro --force
+	dvc repro $(if $(filter 1,$(FORCE)),--force,)
 
-dvc-check:  ## pour faire la validation dvc
+dvc-check0:  ## pour faire la validation dvc
 	@echo "--- Git status ---"
 	@git status
 	@echo ""
@@ -91,6 +93,23 @@ dvc-check:  ## pour faire la validation dvc
 			echo "⚠️  DOUBLON : $$fname tracké dans $$f ET dvc.lock"; \
 		fi \
 	done
+dvc-check:
+	@echo "--- Doublons OUTS + statique (problématique) ---"
+	@for f in $$(find . -name "*.dvc" -not -path "./.dvc/*"); do \
+		fname=$$(grep "path:" $$f | awk '{print $$2}'); \
+		if grep -A 5 "outs:" dvc.lock 2>/dev/null | grep -q "$$fname"; then \
+			echo "⚠️  DOUBLON OUTS : $$fname"; \
+		fi \
+	done
+	@echo ""
+	@echo "--- Fichiers statiques en DEPS (normal) ---"
+	@for f in $$(find . -name "*.dvc" -not -path "./.dvc/*"); do \
+		fname=$$(grep "path:" $$f | awk '{print $$2}'); \
+		if grep -A 5 "deps:" dvc.lock 2>/dev/null | grep -q "$$fname"; then \
+			echo "✅ DEPS OK : $$fname"; \
+		fi \
+	done
+
 
 dvc-push: ## on push les fichiers généré par une repro ou les fichiers add externe
 	dvc push
