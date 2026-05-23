@@ -114,13 +114,14 @@ openssl x509 -req \
 # ============================================
 title "ÉTAPE 5 - htpasswd"
 # ============================================
-if [ -f ${CERTFLD}/.htpasswd ]; then
-    echo "✅ ${CERTFLD}/.htpasswd existant — réutilisation"
+htpasswdFILE=${CERTFLD}/../.htpasswd
+if [ -f $htpasswdFILE ]; then
+    echo "✅ $htpasswdFILE existant — réutilisation"
     echo "Pour d'autres accounts :"
-    echo "htpasswd -c ${CERTFLD}/.htpasswd paulbismuth"
+    echo "htpasswd -c $htpasswdFILE paulbismuth"
 else
     echo "=== Création mot de passe admin nginx ==="
-    htpasswd -c ${CERTFLD}/.htpasswd admin
+    htpasswd -c $htpasswdFILE admin
 fi
 title "=== ✅ Secrets générés dans ${CERTFLD}/  ==="
 
