@@ -7,7 +7,7 @@ certs/*.key
 certs/*.crt
 certs/*.csr
 certs/*.srl
-dockers/nginx/certs/*.pem
+certs/*.pem
 
 # ======================
 # Nginx - Authentification
