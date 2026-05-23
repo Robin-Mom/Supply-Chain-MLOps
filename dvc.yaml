@@ -1,10 +1,13 @@
 stages:
 
-  collect:
-    cmd: python src/collect.py
+  mergInc:
+    #différente forme d'appelle
+    #cmd:  python -c "import sys; from src.collect import merge_avis; merge_avis(sys.argv[1])" params.yaml
+    #cmd:  python -c "from src.collect import merge_avis; merge_avis('params.yaml')" 
+    cmd:  python -c "from src.collect import merge_avis; merge_avis()" 
     deps:
       - params.yaml
-      - src/preprocess.py
+      - src/collect.py
       - data/avis_40k.csv
       - data/avis_28k.csv
     outs:
