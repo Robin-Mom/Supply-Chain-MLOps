@@ -3,28 +3,34 @@ services:
   api:
     build:
       context: .
-      dockerfile: Dockerfile  # On peut avoir un Dockerfile spécifique pour l'API
+      dockerfile: Dockerfile
+    image: ${COMPOSE_PROJECT_NAME:-mlopsv}-app          # ← nomme et tag l'image buildée, COMPOSE_PROJECT_NAME vient de -p
     ports:
       - "8000:8000"
     volumes:
-      - .:/app  # Permet de voir les modifs de code en temps réel (développement)
+      - .:/app # Permet de voir les modifs de code en temps réel (développement)
       - /app/.venv
     env_file:
-      - .env  # On va mettre tes identifiants DagsHub ici pour la sécurité
-    # On s'assure que l'API ne se lance que si les modèles sont là
+      - .env
     command: ["uvicorn", "src.api:app", "--host", "0.0.0.0", "--port", "8000"]
-  
+
   # Service 2 : Le Trainer (Cycle de vie ML)
   trainer:
-    build:
-      context: .
-      dockerfile: Dockerfile  # Un Dockerfile spécifique pour le trainer
+    image: ${COMPOSE_PROJECT_NAME:-mlopsv}-app          # ← réutilise l'image buildée par api
+    profiles:
+      - training               # ← exclu du up classique ✅
     volumes:
       - .:/app
     env_file:
       - .env
     # Ce container s'éteint tout seul une fois l'entraînement fini
     command: ["dvc", "repro", "--force"]
+
+# Démarrage normal — trainer ignoré
+#docker compose up -d
+# Lancer trainer manuellement si besoin et voir les trois options de lancement via dags ou mlflow 
+#docker compose --profile training run --rm trainer
+
 
 # app/docker-compose.yaml — rejoindre le réseau
 networks:
