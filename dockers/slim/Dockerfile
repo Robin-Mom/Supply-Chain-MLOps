@@ -33,6 +33,9 @@ COPY ${DOCKFLD}requirements-base.txt \
 RUN pip install --no-cache-dir --prefix=/install \
         -r requirements-${BACKEND}.txt
 
+# reprise de 4. Téléchargement des assets NLP
+#RUN python -m spacy download fr_core_news_sm
+#RUN python -m nltk.downloader punkt
 # Modèles spacy et nltk dans le prefix aussi
 RUN PYTHONPATH=/install/lib/python3.12/site-packages \
     python -m spacy download fr_core_news_sm \
@@ -40,6 +43,8 @@ RUN PYTHONPATH=/install/lib/python3.12/site-packages \
 
 RUN PYTHONPATH=/install/lib/python3.12/site-packages \
     python -m nltk.downloader -d /install/lib/python3.12/nltk_data punkt punkt_tab
+
+
 
 # ════════════════════════════════════════════════════════════════════════════
 # STAGE 2 – runtime  (image finale, minimale)
@@ -68,7 +73,7 @@ COPY --from=builder /install /usr/local
 WORKDIR /app
 COPY . .
 
-# Exposer le port de l'API
+# Exposer le port de l'API, peut être commun au trainer
 EXPOSE 8000
 
 # Commande pour lancer l'API - pas avec uv run qui refait l'install - à voir aussi dans le docker compose
