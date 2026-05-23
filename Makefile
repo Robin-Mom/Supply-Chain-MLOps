@@ -59,10 +59,40 @@ airflow_ps:  ## list process runnings $(DOCKER_COMPOSE) -f airflow/docker-compos
 	$(DOCKER_COMPOSE) -f dockers/airflow/docker-compose.yaml ps
 
 # ── dvc ────────────────────────────────────────────────────
+# La règle à afficher dans le README ou le Makefile
+# UN fichier ne peut être tracké QUE par l'un des deux :
+# Fichier SOURCE    →  .dvc file    (dvc add)
+# Fichier GÉNÉRÉ   →  dvc.lock     (dvc repro)
+# Si les deux existent pour le même fichier → PROBLÈME
+
+dvc-mergeInc:
+
+
 dvc-repro:
 	dvc repro --force
 
-dvc-push: ## on push sauf si la config
+dvc-check:  ## pour faire la validation dvc
+	@echo "--- Git status ---"
+	@git status
+	@echo ""
+	@echo "--- DVC status ---"
+	@dvc status
+	@echo ""
+	@echo "--- Fichiers dans dvc.lock ---"
+	@grep "path:" dvc.lock
+	@echo ""
+	@echo "--- Fichiers .dvc statiques (tracking résiduel) ---"
+	@find . -name "*.dvc" -not -path "./.dvc/*"
+	@echo ""
+	@echo "--- Doublons statique + dynamique ---"
+	@for f in $$(find . -name "*.dvc" -not -path "./.dvc/*"); do \
+		fname=$$(grep "path:" $$f | awk '{print $$2}'); \
+		if grep -q "$$fname" dvc.lock 2>/dev/null; then \
+			echo "⚠️  DOUBLON : $$fname tracké dans $$f ET dvc.lock"; \
+		fi \
+	done
+
+dvc-push: ## on push les fichiers généré par une repro ou les fichiers add externe
 	dvc push
 	git add dvc.lock
 	git commit -m "update pipeline"
