@@ -99,11 +99,14 @@ slmbuild-test: ## Build image de test CPU :: make slimbuild-test
 #docker image for nginx proxy server & all
 start-project:
 	# was  docker-compose up --build api
-	docker compose -p $(PROJECT) -f docker_compose1.yaml up -d --build
+	docker compose -p $(PROJECT) -f docker-compose1.yaml up -d --dry-run
+	#--build
 
 log-project:
-	docker compose -p $(PROJECT) logs
+	docker compose -p $(PROJECT) -f docker-compose1.yaml logs
 	
 stop-project:
-	docker compose -p $(PROJECT) down -v
+	docker compose -p $(PROJECT) -f docker-compose1.yaml down -v
 
+diag-project:
+	docker compose -p $(PROJECT) -f docker-compose1.yaml config

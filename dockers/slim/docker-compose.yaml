@@ -12,6 +12,8 @@ services:
       - /app/.venv
     env_file:
       - .env
+    networks:
+      - airflow_default  # ✅ référence uniquement
     command: ["uvicorn", "src.api:app", "--host", "0.0.0.0", "--port", "8000"]
 
   # Service 2 : Le Trainer (Cycle de vie ML)
@@ -33,6 +35,6 @@ services:
 
 
 # app/docker-compose.yaml — rejoindre le réseau
-networks:
-  airflow_default:
-    external: true               # réseau déjà créé par la stack Airflow
+#networks:
+#  airflow_default:
+#    external: true               # réseau déjà créé par la stack Airflow
