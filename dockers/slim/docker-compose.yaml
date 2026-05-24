@@ -4,6 +4,10 @@ services:
     build:
       context: .
       dockerfile: Dockerfile
+      args:
+        BACKEND: ${BACKEND:-cpu}
+        DOCKFLD: ${DOCKFLD}
+        #DAGSHUB_TOKEN: ${DAGSHUB_TOKEN}
     image: ${COMPOSE_PROJECT_NAME:-mlopsv}-app          # ← nomme et tag l'image buildée, COMPOSE_PROJECT_NAME vient de -p
     ports:
       - "8000:8000"
@@ -12,9 +16,15 @@ services:
       - /app/.venv
     env_file:
       - ../../.env
-    networks:
-      - airflow_default  # ✅ référence uniquement
+    #networks:
+    #  - airflow_default  # ✅ référence uniquement
     command: ["uvicorn", "src.api:app", "--host", "0.0.0.0", "--port", "8000"]
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/health')"]
+      interval: 5s      # vérifie toutes les 5s
+      timeout: 3s
+      retries: 5        # considère healthy après 5 succès
+      start_period: 30s # laisse 30s à l'API pour démarrer
 
   # Service 2 : Le Trainer (Cycle de vie ML)
   trainer:
@@ -35,6 +45,7 @@ services:
 
 
 # app/docker-compose.yaml — rejoindre le réseau
-#networks:
-#  airflow_default:
-#    external: true               # réseau déjà créé par la stack Airflow
+networks:
+  airflow_default:
+    external: true               # réseau déjà créé par la stack Airflow
+    name: airflow_default

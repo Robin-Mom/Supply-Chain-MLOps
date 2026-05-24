@@ -1,9 +1,12 @@
+#import .env
+include .env
+export
 
 # Variables possible
 BACKEND   ?= cpu
 IMAGE     := supply-chain-mlops-slim
 TAG       := $(IMAGE):$(BACKEND)
-DOCKFLD   :=
+DOCKFLD   := dockers/slim/
 DOCK      := Dockerfile
 # a project variable that will server to prefix the images and containers and identify the ressources for cleaning
 # mainly used in -p option of docker compose -d or idn docker-compose
@@ -151,34 +154,41 @@ slmbuild-gpu: ## Build GPU (CUDA 12.4) explicitement
 slmbuild-test: ## Build image de test CPU :: make slimbuild-test
 	$(MAKE) slmbuild-cpu IMAGE=supply-test
 
+slmtestconfig: ## Testing the docker compose config
+	docker compose -f docker-compose1.yaml config |less #| grep -A 10 "args"
+	# On voit les bon transferts d'arguments
 
 #docker image for nginx proxy server & all
 start-project:
 	# was  docker-compose up --build api
-	docker compose -p $(PROJECT) -f docker-compose1.yaml up -d --build #--dry-run
+	docker network create airflow_default 2>/dev/null || true
+	$(DOCKER_COMPOSE) -p $(PROJECT) -f docker-compose1.yaml up -d --build 
+	#--dry-run
 
 log-project:
-	docker compose -p $(PROJECT) -f docker-compose1.yaml logs
+	$(DOCKER_COMPOSE) -p $(PROJECT) -f docker-compose1.yaml logs
 	
 stop-project:
-	docker compose -p $(PROJECT) -f docker-compose1.yaml down -v
+	$(DOCKER_COMPOSE) -p $(PROJECT) -f docker-compose1.yaml down -v
 
 diag-project:
-	docker compose -p $(PROJECT) -f docker-compose1.yaml config
+	$(DOCKER_COMPOSE) -p $(PROJECT) -f docker-compose1.yaml config
 
 
-# Détecte la machine automatiquement
+# Détecte la machine automatiquement - I car on travaillera en IP pas en dns pour la config nginx
 CURRENT_IP := $(shell hostname -I | awk '{print $$1}')
 
 start-api:
 	@echo "Lancement API sur $(CURRENT_IP)"
-	docker compose -p $(PROJECT) -f docker-compose1.yaml up -d --build
+	docker network create airflow_default 2>/dev/null || true
+	$(DOCKER_COMPOSE) -p $(PROJECT) -f docker-compose1.yaml up -d --build
+
 
 start-airflow:
 	@echo "Lancement Airflow sur $(CURRENT_IP)"
-	docker compose -p $(PROJECT) -f docker-compose1.yaml up -d
+	$(DOCKER_COMPOSE) -p $(PROJECT) -f docker-compose1.yaml up -d
 
-start-ip-conditional: 
+start-ip-conditional:
 	@if [ "$(CURRENT_IP)" = "${API_HOST}" ]; then \
 		make start-api; \
 	elif [ "$(CURRENT_IP)" = "${AIRFLOW_HOST}" ]; then \

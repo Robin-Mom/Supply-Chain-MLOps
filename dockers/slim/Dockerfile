@@ -13,9 +13,9 @@ ARG BACKEND=cpu          # valeurs : cpu | gpu
 FROM python:3.12-slim AS builder
 
 ARG BACKEND
-ARG DOCKFLD=dockers/api/
-RUN echo "Invoqué depuis : $DOCKFLD"
-
+ARG DOCKFLD
+RUN echo "Invoqué depuis slim Dockerfile: ${DOCKFLD}"
+RUN echo "et donc truc $(pwd)!!"
 RUN apt-get update && apt-get install -y --no-install-recommends \
         git \
         build-essential \
@@ -23,11 +23,11 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     && rm -rf /var/lib/apt/lists/*
 
 WORKDIR /build
-RUN set
+
 # On copie uniquement les fichiers de dépendances
-COPY ${DOCKFLD}requirements-base.txt \
-     ${DOCKFLD}requirements-cpu.txt  \
-     ${DOCKFLD}requirements-gpu.txt  .
+
+COPY ./requirements-base.txt .
+COPY ./requirements-${BACKEND}.txt .
 
 # Installation dans un prefix isolé → facile à copier au stage suivant
 RUN pip install --no-cache-dir --prefix=/install \
