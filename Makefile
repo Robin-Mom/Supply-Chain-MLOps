@@ -32,7 +32,8 @@ help: ## this help
 
 # ── Build dev Certificate Authority and Certificates for 443 ──
 secrets:
-	./dockers/nginx/certs/secretgen.sh localhost ./dockers/nginx/certs
+	#note j'ai mis une IP variable 108.130.252.7 mais on en a pas besoin - juste pour que le dossier certs soit en 4ème param
+	./dockers/nginx/certs/secretgen.sh localhost LIORA-VM-77Gi 108.130.252.7 ./dockers/nginx/certs
 
 # ── Airflow ────────────────────────────────────────────────────
 # AIRFLOW INIT SECTION TO ALWAYS RUN FIRST TIME DEPLOYED ON A NEW DEVICE

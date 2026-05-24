@@ -14,6 +14,9 @@ services:
       - ./certs/nginx.crt:/etc/nginx/certs/nginx.crt:ro
       - ./certs/nginx.key:/etc/nginx/certs/nginx.key:ro      
       - ./.htpasswd:/etc/nginx/.htpasswd:ro
+      - ./auth.conf:/etc/nginx/auth.conf:ro
+      - ./proxy_headers.conf:/etc/nginx/proxy_headers.conf:ro 
+
     depends_on:
       prometheus:
         condition: service_started
@@ -58,6 +61,11 @@ services:
     environment:
       - GF_SECURITY_ADMIN_USER=admin
       - GF_SECURITY_ADMIN_PASSWORD=admin
+      - GF_SERVER_ROOT_URL=https://%(domain)s/grafana/   # ✅
+      - GF_SERVER_SERVE_FROM_SUB_PATH=true               # ✅
+      # ROOT_URL            →  URLs absolues correctes       ✅
+      # SERVE_FROM_SUB_PATH →  assets relatifs au sous-chemin  ✅
+      # Les deux ensemble   →  Grafana fonctionne derrière nginx ✅
 
 volumes:
   prometheus_data:
