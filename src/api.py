@@ -6,17 +6,13 @@ from sentence_transformers import SentenceTransformer
 import numpy as np
 import os
 import json
-
+from contextlib import asynccontextmanager
+from fastapi.responses import Response 
 
 # ---------------------------------------------------------
 # CONFIGURATION & CHARGEMENT (Allégé)
 # ---------------------------------------------------------
 
-app = FastAPI(
-    title="Oscaro Trustpilot API - Direct Meta-Clustering",
-    description="API optimisée : Embedding -> KMeans Meta-Topic",
-    version="1.3.0"
-)
 
 # Chemins vers les artefacts
 MODEL_PATH = "models/BERTopic"
@@ -25,15 +21,34 @@ LABELS_PATH = MODEL_PATH + "_meta_labels.pkl"
 METRICS_PATH = "metrics/silhouette.json"
 ST_MODEL_NAME = "paraphrase-multilingual-mpnet-base-v2"
 
+kmeans, meta_labels, embedding_model = None, None, None
 
-# Chargement des artefacts au démarrage
-try:
-    kmeans = joblib.load(KMEANS_PATH)
-    meta_labels = joblib.load(LABELS_PATH)
-    embedding_model = SentenceTransformer(ST_MODEL_NAME)
-    print("✅ API prête : Inférence directe via KMeans chargée.")
-except Exception as e:
-    print(f"❌ Erreur de chargement des artefacts : {e}")
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    # ← startup : tout ce qui était dans on_event("startup")
+    global kmeans,meta_labels,embedding_model
+    # Chargement des artefacts au démarrage
+    try:
+        kmeans = joblib.load(KMEANS_PATH)
+        meta_labels = joblib.load(LABELS_PATH)
+        embedding_model = SentenceTransformer(ST_MODEL_NAME)
+        print("✅ API prête : Inférence directe via KMeans chargée.")
+    except Exception as e:
+        print(f"❌ Erreur de chargement des artefacts : {e}")
+
+    yield              # ← l'API tourne ici
+
+    # ← shutdown : tout ce qui était dans on_event("shutdown")
+    print("🛑 Arrêt API")
+    app.state.model = None
+
+app = FastAPI(lifespan=lifespan,
+    title="Oscaro Trustpilot API - Direct Meta-Clustering",
+    description="API optimisée : Embedding -> KMeans Meta-Topic",
+    version="1.3.0"
+)
+
+
 
 # ---------------------------------------------------------
 # SCHÉMAS DE DONNÉES
@@ -99,9 +114,13 @@ def get_metrics():
     with open(METRICS_PATH, "r") as f:
         return json.load(f)
 
+
+# Health check qui vérifie que le modèle est bien chargé
 @app.get("/health")
-async def health_check():
-    return {"status": "healthy"}
+def health():
+    if embedding_model is None:
+        return Response(status_code=503, content="embedding_model not loaded")
+    return {"status": "ok", "model": "loaded"}
 
 # ---------------------------------------------------------
 # ENDPOINTS D'ENTRAÎNEMENT (DVC)
