@@ -38,7 +38,8 @@ stages:
       - data/avis_bertopic.csv
 
   train:
-    cmd: python src/train.py --filepath data/avis_bertopic.csv --model_output models/BERTopic
+    #cmd: bash -c 'python src/train.py --filepath data/avis_bertopic.csv --model_output models/BERTopic  $TRAIN_ARGS'
+    cmd: python src/train.py --filepath data/avis_bertopic.csv --model_output models/BERTopic $TRAIN_ARGS
     deps:
       - src/train.py
       - data/avis_bertopic.csv
