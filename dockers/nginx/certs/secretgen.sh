@@ -32,7 +32,9 @@ function result(){
 
 
 DOMAIN=${1:-localhost}
-CERTFLD=${2:-../certs}
+SERVER_NAME=${2:-liora_vm_7gi}    # ← nom DNS dans /etc/hosts
+SERVER_IP=${3:-10.0.0.1}          # ← IP privée variable inutile
+CERTFLD=${4:-../certs}            # certs folder location
 
 # =================================================
 title "ÉTAPE 1 — CA (une seule fois)"
@@ -82,9 +84,10 @@ keyUsage       = digitalSignature, keyEncipherment
 extendedKeyUsage = serverAuth
 
 [ alt_names ]
-#DNS.1 = ${DOMAIN}
-DNS.2 = localhost
+DNS.1 = localhost
+DNS.2 = ${DOMAIN}     # ← nom DNS /etc/hosts
 IP.1  = 127.0.0.1
+#IP.2  = ${SERVER_IP}  # ← IP privée fixe - mais ne sert à rien
 EOF
 
 cat ${CERTFLD}/openssl.cnf
