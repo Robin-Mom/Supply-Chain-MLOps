@@ -20,7 +20,7 @@ export AIRFLOW_GID := 0
 
 # ── Phony ─────────────────────────────────────────────────────
 #target not to take for files but command lines are liste in the .PHONY statement
-.PHONY: help secrets airflow_init airflow_prepdocker_sock airflow_up airflow_force_recreate airflow_down airflow_reset airflow_ps dvc_repro dvc_push up down slmbuild slmbuild-cpu slmbuild-gpu slmbuild-test
+.PHONY: help secrets airflow_init airflow_prepdocker_sock airflow_up airflow_force_recreate airflow_down airflow_reset airflow_ps dvc-repro dvc-push up down slmbuild slmbuild-cpu slmbuild-gpu slmbuild-test start-api start-airflow start-ip-conditional
 
 # ── Help ──────────────────────────────────────────────────────
 help: ## this help
@@ -73,7 +73,7 @@ dvc-mergeInc:  ## merge a set with incremental overlapping 40K ith 28k
 dvc-repro:
 	dvc repro $(if $(filter 1,$(FORCE)),--force,)
 
-dvc-check0:  ## pour faire la validation dvc
+dvc-check:  ## pour faire la validation dvc
 	@echo "--- Git status ---"
 	@git status
 	@echo ""
@@ -86,16 +86,8 @@ dvc-check0:  ## pour faire la validation dvc
 	@echo "--- Fichiers .dvc statiques (tracking résiduel) ---"
 	@find . -name "*.dvc" -not -path "./.dvc/*"
 	@echo ""
-	@echo "--- Doublons statique + dynamique ---"
-	@for f in $$(find . -name "*.dvc" -not -path "./.dvc/*"); do \
-		fname=$$(grep "path:" $$f | awk '{print $$2}'); \
-		if grep -q "$$fname" dvc.lock 2>/dev/null; then \
-			echo "⚠️  DOUBLON : $$fname tracké dans $$f ET dvc.lock"; \
-		fi \
-	done
-dvc-check:
 	@echo "--- Doublons OUTS + statique (problématique) ---"
-	@for f in $$(find . -name "*.dvc" -not -path "./.dvc/*"); do \
+	@for f in $$(find . -name "*.dvc" -not -path "./.dvc"); do \
 		fname=$$(grep "path:" $$f | awk '{print $$2}'); \
 		if grep -A 5 "outs:" dvc.lock 2>/dev/null | grep -q "$$fname"; then \
 			echo "⚠️  DOUBLON OUTS : $$fname"; \
@@ -103,7 +95,7 @@ dvc-check:
 	done
 	@echo ""
 	@echo "--- Fichiers statiques en DEPS (normal) ---"
-	@for f in $$(find . -name "*.dvc" -not -path "./.dvc/*"); do \
+	@for f in $$(find . -name "*.dvc" -not -path "./.dvc"); do \
 		fname=$$(grep "path:" $$f | awk '{print $$2}'); \
 		if grep -A 5 "deps:" dvc.lock 2>/dev/null | grep -q "$$fname"; then \
 			echo "✅ DEPS OK : $$fname"; \
@@ -116,6 +108,10 @@ dvc-push: ## on push les fichiers généré par une repro ou les fichiers add ex
 	git add dvc.lock
 	git commit -m "update pipeline"
 	git push
+
+dvc-utest: ## Unit testing dvc on local host before going on prod - à customizer selon besoin
+	#15 mn pour 4000 avis
+	export TRAIN_ARGS="--exp_name Bertopic_Trustpilot_v2" && dvc repro --downstream train --force
 
 
 # ── Global ────────────────────────────────────────────────────
@@ -159,8 +155,7 @@ slmbuild-test: ## Build image de test CPU :: make slimbuild-test
 #docker image for nginx proxy server & all
 start-project:
 	# was  docker-compose up --build api
-	docker compose -p $(PROJECT) -f docker-compose1.yaml up -d --dry-run
-	#--build
+	docker compose -p $(PROJECT) -f docker-compose1.yaml up -d --build #--dry-run
 
 log-project:
 	docker compose -p $(PROJECT) -f docker-compose1.yaml logs
@@ -170,3 +165,22 @@ stop-project:
 
 diag-project:
 	docker compose -p $(PROJECT) -f docker-compose1.yaml config
+
+
+# Détecte la machine automatiquement
+CURRENT_IP := $(shell hostname -I | awk '{print $$1}')
+
+start-api:
+	@echo "Lancement API sur $(CURRENT_IP)"
+	docker compose -p $(PROJECT) -f docker-compose1.yaml up -d --build
+
+start-airflow:
+	@echo "Lancement Airflow sur $(CURRENT_IP)"
+	docker compose -p $(PROJECT) -f docker-compose1.yaml up -d
+
+start-ip-conditional: 
+	@if [ "$(CURRENT_IP)" = "${API_HOST}" ]; then \
+		make start-api; \
+	elif [ "$(CURRENT_IP)" = "${AIRFLOW_HOST}" ]; then \
+		make start-airflow; \
+	fi

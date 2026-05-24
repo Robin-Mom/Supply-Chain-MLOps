@@ -8,10 +8,10 @@ services:
     ports:
       - "8000:8000"
     volumes:
-      - .:/app # Permet de voir les modifs de code en temps réel (développement)
+      - ../../.:/app # Permet de voir les modifs de code en temps réel (développement)
       - /app/.venv
     env_file:
-      - .env
+      - ../../.env
     networks:
       - airflow_default  # ✅ référence uniquement
     command: ["uvicorn", "src.api:app", "--host", "0.0.0.0", "--port", "8000"]
@@ -22,9 +22,9 @@ services:
     profiles:
       - training               # ← exclu du up classique ✅
     volumes:
-      - .:/app
+      - ../../.:/app
     env_file:
-      - .env
+      - ../../.env
     # Ce container s'éteint tout seul une fois l'entraînement fini
     command: ["dvc", "repro", "--force"]
 

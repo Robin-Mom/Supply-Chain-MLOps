@@ -56,7 +56,7 @@ def main(verbose, exp_name, run_name, artifact_path, filepath, sep, colname, sen
 	os.makedirs(logdir, exist_ok=True)
 	with open(log_output, "w", encoding="utf-8") as f:
 		f.write(f"MINIMAL LOGGING: Loading processed data: {filepath}\n")
-	df_processed = pd.read_csv(filepath, sep=sep)
+	df_processed = pd.read_csv(filepath, sep=sep).head(4000) #test filtering
 	documents = df_processed[colname].tolist()
 	log.info(f"MINIMAL LOGGING: Data loaded")
 	with open(log_output, "a", encoding="utf-8") as f:
