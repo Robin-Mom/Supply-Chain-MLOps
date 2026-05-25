@@ -51,6 +51,17 @@ services:
       - --config.file=/etc/prometheus/prometheus.yml
       - --web.external-url=/prometheus/    # ← obligatoire ✅
       - --web.route-prefix=/prometheus/    # ← obligatoire ✅
+      - --web.enable-lifecycle             # ← active /-/reload
+
+  pushgateway:
+    image: prom/pushgateway
+    expose:
+      - "9091"
+    command:
+      - --persistence.file=/data/pushgateway.db   # ← persist ✅
+    volumes:
+      - pushgateway_data:/data
+
 
   grafana:
     image: grafana/grafana:latest
@@ -73,3 +84,4 @@ services:
 volumes:
   prometheus_data:
   grafana_data:
+  pushgateway_data:

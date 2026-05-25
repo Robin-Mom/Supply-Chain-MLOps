@@ -30,8 +30,7 @@ COPY ./requirements-base.txt .
 COPY ./requirements-${BACKEND}.txt .
 
 # Installation dans un prefix isolé → facile à copier au stage suivant
-RUN pip install --no-cache-dir --prefix=/install \
-        -r requirements-${BACKEND}.txt
+RUN pip install --no-cache-dir --prefix=/install -r requirements-${BACKEND}.txt
 
 # reprise de 4. Téléchargement des assets NLP
 #RUN python -m spacy download fr_core_news_sm
