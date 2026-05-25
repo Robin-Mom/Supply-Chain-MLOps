@@ -9,6 +9,9 @@ import json
 from contextlib import asynccontextmanager
 from fastapi.responses import Response, FileResponse
 
+# Illustration collect par le petit container PushGateway pour une alimentation à la demande
+from prometheus_client import CollectorRegistry, Gauge, push_to_gateway
+from numpy import random
 # ---------------------------------------------------------
 # CONFIGURATION & CHARGEMENT (Allégé)
 # ---------------------------------------------------------
@@ -154,10 +157,30 @@ async def trigger_train(background_tasks: BackgroundTasks):
 
 @app.get("/metrics", tags=["MLOps"], summary="🔎 Metriques du model")
 def get_metrics():
-    """Retourne le score de silhouette calculé lors de l'évaluation"""
+    """Retourne le score de silhouette calculé lors de l'évaluation
+       Et Push le score silhouette dans les metrics pour grafan via pushgateway prometheus
+    """
+
     if not os.path.exists(METRICS_PATH):
         return {"error": "Metrics file not found. Run dvc repro first."}
     
     with open(METRICS_PATH, "r") as f:
-        return json.load(f)
+        data = json.load(f)
+        registry = CollectorRegistry()
+        g = Gauge(
+            "model_silhouette_score",
+            "Silhouette score du modèle",
+            registry=registry
+        )
+        g.set(data["silhouette_score"] + random.rand())  #a bit of random just for the sake of demo and avoid monotony
+
+        push_to_gateway(
+            "pushgateway:9091",   # ← service docker:port
+            job="trainer",
+            registry=registry
+        )
+
+        return data
+
+
 

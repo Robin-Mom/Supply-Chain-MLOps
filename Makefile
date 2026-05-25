@@ -211,9 +211,15 @@ cleanDandling: ## Disk Space Recycling
 	# Supprimer les dangling images
 	@ docker image prune -f
 
+uvPruning: ## one of the hardest hit, with --ci also ref https://docs.astral.sh/uv/concepts/cache/#clearing-the-cache
+	@ uv cache prune --ci
 
 nginxConfReload: ## reload a chaud pour tester un changement de config nginx
 	docker exec nginx_revproxy nginx -s reload
 
 nginxLogs: ## view the logs
-	docker compose -p pr001 -f docker-compose1.yaml logs -f	
+	docker compose -p pr001 -f docker-compose1.yaml logs -f
+
+updateFreeze: ## Update the slim requirement-freeze.txt, make it used in the resolution if it exists
+	# once docker is up we can capture the pip resolution and reapply
+	docker exec pr001-api-1 pip freeze > dockers/slim/requirements-freeze.txt
