@@ -26,7 +26,7 @@ METRICS_PATH = "metrics/best_score.json"
 MODEL_PATH = "models/BERTopic"
 KMEANS_PATH = MODEL_PATH + "_kmeans.pkl"
 LABELS_PATH = MODEL_PATH + "_meta_labels.pkl"
-METRICS_PATH = "metrics/silhouette.json"
+
 ST_MODEL_NAME = "paraphrase-multilingual-mpnet-base-v2"
 
 # ---------------------------------------------------------
