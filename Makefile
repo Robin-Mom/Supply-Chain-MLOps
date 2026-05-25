@@ -23,7 +23,7 @@ export AIRFLOW_GID := 0
 
 # ── Phony ─────────────────────────────────────────────────────
 #target not to take for files but command lines are liste in the .PHONY statement
-.PHONY: help secrets airflow_init airflow_prepdocker_sock airflow_up airflow_force_recreate airflow_down airflow_reset airflow_ps dvc-repro dvc-push up down slmbuild slmbuild-cpu slmbuild-gpu slmbuild-test start-api start-airflow start-ip-conditional
+.PHONY: help secrets airflow_init airflow_prepdocker_sock airflow_up airflow_force_recreate airflow_down airflow_reset airflow_ps dvc-repro dvc-push up down slmbuild slmbuild-cpu slmbuild-gpu slmbuild-test start-api start-airflow start-ip-conditional clean cleanDandling
 
 # ── Help ──────────────────────────────────────────────────────
 help: ## this help
@@ -179,19 +179,41 @@ diag-project:
 # Détecte la machine automatiquement - I car on travaillera en IP pas en dns pour la config nginx
 CURRENT_IP := $(shell hostname -I | awk '{print $$1}')
 
-start-api:
+start-api:  ## starting grafana < prometheus < api < nginx
 	@echo "Lancement API sur $(CURRENT_IP)"
 	docker network create airflow_default 2>/dev/null || true
 	$(DOCKER_COMPOSE) -p $(PROJECT) -f docker-compose1.yaml up -d --build
 
 
-start-airflow:
+start-airflow: ## airflow start separation to consider on localhost mono approad
 	@echo "Lancement Airflow sur $(CURRENT_IP)"
 	$(DOCKER_COMPOSE) -p $(PROJECT) -f docker-compose1.yaml up -d
 
-start-ip-conditional:
+start-ip-conditional: ## 👍 main starter that separate for starting on different hosts
 	@if [ "$(CURRENT_IP)" = "${API_HOST}" ]; then \
 		make start-api; \
 	elif [ "$(CURRENT_IP)" = "${AIRFLOW_HOST}" ]; then \
 		make start-airflow; \
 	fi
+
+clean: ## Disk Space Recycling
+	@ echo "=== Initial State ==="
+	@ docker system df
+	# Supprimer les dangling images
+	@ docker image prune -f
+	@ docker container prune -f
+	@ docker volume prune -f
+	@ docker builder prune -af
+	@ echo "=== Post Cleaning State ==="
+	@ docker system df
+
+cleanDandling: ## Disk Space Recycling
+	# Supprimer les dangling images
+	@ docker image prune -f
+
+
+nginxConfReload: ## reload a chaud pour tester un changement de config nginx
+	docker exec nginx_revproxy nginx -s reload
+
+nginxLogs: ## view the logs
+	docker compose -p pr001 -f docker-compose1.yaml logs -f	

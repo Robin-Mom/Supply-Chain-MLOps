@@ -18,7 +18,7 @@ services:
       - ../../.env
     #networks:
     #  - airflow_default  # ✅ référence uniquement
-    command: ["uvicorn", "src.api:app", "--host", "0.0.0.0", "--port", "8000"]
+    command: ["uvicorn", "src.api:app", "--host", "0.0.0.0", "--port", "8000", "--reload"]
     healthcheck:
       test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/health')"]
       interval: 5s      # vérifie toutes les 5s

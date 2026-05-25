@@ -7,7 +7,7 @@ import numpy as np
 import os
 import json
 from contextlib import asynccontextmanager
-from fastapi.responses import Response 
+from fastapi.responses import Response, FileResponse
 
 # ---------------------------------------------------------
 # CONFIGURATION & CHARGEMENT (Allégé)
@@ -31,7 +31,7 @@ async def lifespan(app: FastAPI):
     try:
         kmeans = joblib.load(KMEANS_PATH)
         meta_labels = joblib.load(LABELS_PATH)
-        embedding_model = SentenceTransformer(ST_MODEL_NAME)
+        #embedding_model = SentenceTransformer(ST_MODEL_NAME)
         print("✅ API prête : Inférence directe via KMeans chargée.")
     except Exception as e:
         print(f"❌ Erreur de chargement des artefacts : {e}")
@@ -48,8 +48,6 @@ app = FastAPI(lifespan=lifespan,
     version="1.3.0"
 )
 
-
-
 # ---------------------------------------------------------
 # SCHÉMAS DE DONNÉES
 # ---------------------------------------------------------
@@ -62,15 +60,31 @@ class PredictResponse(BaseModel):
     meta_topic: int
     meta_label: str
 
+
+@app.get("/favicon.ico", include_in_schema=False)
+async def favicon():
+    response = FileResponse("app/static/trustp.png")#,media_type="image/png")
+    response.headers["Cache-Control"] = "no-cache, no-store" 
+    return response
+
+@app.get("/", tags=["Toolbox"], summary="🏡 tester le home")
+def home():
+    return {"status": "online", "method": "Direct KMeans Inference"}
+
+# Health check qui vérifie que le modèle est bien chargé
+@app.get("/health", tags=["Toolbox"], summary="💖🩺 Santé du serveur")
+def health():
+    #tempo config health check switch if embedding_model is None:
+    if kmeans is None:
+        return Response(status_code=503, content="embedding_model not loaded")
+    return {"status": "ok", "model": "loaded"}
+
+
 # ---------------------------------------------------------
 # ENDPOINTS DE PREDICTION
 # ---------------------------------------------------------
 
-@app.get("/")
-def home():
-    return {"status": "online", "method": "Direct KMeans Inference"}
-
-@app.post("/predict", response_model=PredictResponse)
+@app.post("/predict", response_model=PredictResponse,  tags=["MLOps"], summary="🚀 Prédiction du model")
 async def predict_endpoint(data: AvisInput):
     """
     Reproduction exacte de la logique de predict.py
@@ -101,32 +115,13 @@ async def predict_endpoint(data: AvisInput):
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
-# ---------------------------------------------------------
-# ENDPOINTS DE MONITORING & MÉTRIQUES
-# ---------------------------------------------------------
 
-@app.get("/metrics")
-def get_metrics():
-    """Retourne le score de silhouette calculé lors de l'évaluation"""
-    if not os.path.exists(METRICS_PATH):
-        return {"error": "Metrics file not found. Run dvc repro first."}
-    
-    with open(METRICS_PATH, "r") as f:
-        return json.load(f)
-
-
-# Health check qui vérifie que le modèle est bien chargé
-@app.get("/health")
-def health():
-    if embedding_model is None:
-        return Response(status_code=503, content="embedding_model not loaded")
-    return {"status": "ok", "model": "loaded"}
 
 # ---------------------------------------------------------
 # ENDPOINTS D'ENTRAÎNEMENT (DVC)
 # ---------------------------------------------------------
 
-@app.post("/train", tags=["MLOps"])
+@app.post("/train", tags=["MLOps"], summary="🚂🚃 Entrainement du model")
 async def trigger_train(background_tasks: BackgroundTasks):
     """
     Lance le pipeline DVC (preprocess -> train -> evaluate) 
@@ -152,3 +147,17 @@ async def trigger_train(background_tasks: BackgroundTasks):
         "status": "Training started",
         "message": "Le pipeline DVC a été lancé en arrière-plan. Vérifie les logs du serveur pour le suivi."
     }
+
+# ---------------------------------------------------------
+# ENDPOINTS DE MONITORING & MÉTRIQUES
+# ---------------------------------------------------------
+
+@app.get("/metrics", tags=["MLOps"], summary="🔎 Metriques du model")
+def get_metrics():
+    """Retourne le score de silhouette calculé lors de l'évaluation"""
+    if not os.path.exists(METRICS_PATH):
+        return {"error": "Metrics file not found. Run dvc repro first."}
+    
+    with open(METRICS_PATH, "r") as f:
+        return json.load(f)
+
