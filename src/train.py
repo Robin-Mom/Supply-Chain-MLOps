@@ -1,24 +1,16 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
-"""train.py:
-Train the model, generate 10 final clusters, export data_clusterized.csv, model, metrics and logs.
-
-AUTHOR
-Robin Mom
-
-VERSION
-1.0
-
-DATE
-29/04/2026
-"""
-### Imports
 
 import argparse
-import logging as log # module standard pour la gestion des messages de diagnostic.
-import pandas as pd
-import numpy as np
+import logging as log
 import os
+import shutil
+import json
+import joblib
+import dagshub
+import mlflow
+import numpy as np
+import pandas as pd
 
 from bertopic import BERTopic
 from sentence_transformers import SentenceTransformer
@@ -26,251 +18,314 @@ from sklearn.cluster import KMeans
 from sklearn.feature_extraction.text import CountVectorizer
 from bertopic.vectorizers import ClassTfidfTransformer
 from spacy.lang.fr.stop_words import STOP_WORDS
-import joblib
-import mlflow
-import dagshub
-
-### MAIN
-
-def main(verbose, exp_name, run_name, artifact_path, filepath, sep, colname, sentenceTransformer, n_clusters, model_output, data_output, log_output, gpu_accel):
 
 
-### @@@ MLflow @@@ Set tracking experiment
-# On commente ou on supprime la ligne locale :
-#	mlflow.set_tracking_uri("http://127.0.0.1:8080")
+def extract_top_words_per_cluster(tfidf_matrix, feature_names, top_n=5):
+    labels = {}
 
-	dagshub.init(repo_owner='schmilblick-ai', repo_name='Supply-Chain-MLOps', mlflow=True)
+    for i in range(tfidf_matrix.shape[0]):
+        row = tfidf_matrix[i].toarray().flatten()
+        top_indices = row.argsort()[-top_n:][::-1]
+        labels[i] = [feature_names[j] for j in top_indices]
 
-# On laisse MLflow utiliser la variable d'environnement MLFLOW_TRACKING_URI 
-# que tu as configurée avec DagsHub.
+    return labels
 
 
-### @@@ MLflow @@@ Define experiment name, run name and artifact_path name
-# Option sûre : force "Default" ou utilise exp_name si tu l'as créé sur DagsHub
-	trustpilot_experiment = mlflow.set_experiment(exp_name)
-	# -------------------------
-	# 1. Données
-	# -------------------------
-	log.info(f"MINIMAL LOGGING: Loading processed data: {filepath}")
-	logdir = os.path.dirname(log_output)
-	os.makedirs(logdir, exist_ok=True)
-	with open(log_output, "w", encoding="utf-8") as f:
-		f.write(f"MINIMAL LOGGING: Loading processed data: {filepath}\n")
-	df_processed = pd.read_csv(filepath, sep=sep)
-	documents = df_processed[colname].tolist()
-	log.info(f"MINIMAL LOGGING: Data loaded")
-	with open(log_output, "a", encoding="utf-8") as f:
-		f.write(f"MINIMAL LOGGING: Data loaded\n")
-	# -------------------------
-	# 2. Embeddings
-	# -------------------------
-	log.info(f"MINIMAL LOGGING: Starting embeddings with {sentenceTransformer}")
-	with open(log_output, "a", encoding="utf-8") as f:
-		f.write(f"MINIMAL LOGGING: Starting embeddings with {sentenceTransformer}\n")
-	device = ""  # gpu accelleration or not
-	if gpu_accel:
-		device="cuda"
-	else:
-		device="cpu"
-	embedding_model = SentenceTransformer(sentenceTransformer, device=device) 
-	embeddings = embedding_model.encode(documents, batch_size=64, show_progress_bar=True)
-	log.info("MINIMAL LOGGING: embeddings complete")
-	with open(log_output, "a", encoding="utf-8") as f:
-		f.write("MINIMAL LOGGING: embeddings complete\n")
-	# -------------------------
-	# 3. BERTopic (clustering initial)
-	# -------------------------
-	log.info("MINIMAL LOGGING: Starting BERTopic clustering pipeline (embeddings + UMAP + HDBSCAN)")
-	with open(log_output, "a", encoding="utf-8") as f:
-		f.write("MINIMAL LOGGING: Starting BERTopic clustering pipeline (embeddings + UMAP + HDBSCAN)\n")
-	topic_model = BERTopic(verbose=False)
-	topics, probs = topic_model.fit_transform(documents, embeddings)
-	log.info("MINIMAL LOGGING: Clustering complete")
-	with open(log_output, "a", encoding="utf-8") as f:
-		f.write("MINIMAL LOGGING: Clustering complete\n")
-	# -------------------------
-	# 4. Calcul des centroïdes par topic
-	# -------------------------
-	log.info("MINIMAL LOGGING: computing centroids from initial embeddings for Meta-clustering")
-	with open(log_output, "a", encoding="utf-8") as f:
-		f.write("MINIMAL LOGGING: computing centroids from initial embeddings for Meta-clustering\n")
-	df = pd.DataFrame({
-		"doc": documents,
-		"topic": topics
-	})
+def main(
+    verbose,
+    exp_name,
+    run_name,
+    filepath,
+    sep,
+    colname,
+    sentenceTransformer,
+    n_clusters,
+    output_dir,
+    log_output,
+    gpu_accel
+):
 
-	df["embedding"] = list(embeddings)
+    dagshub.init(
+        repo_owner='schmilblick-ai',
+        repo_name='Supply-Chain-MLOps',
+        mlflow=True
+    )
 
-	centroids = (
-		df[df.topic != -1]  # enlever outliers
-		.groupby("topic")["embedding"]
-		.apply(lambda x: np.mean(np.vstack(x), axis=0))
-	)
+    mlflow.set_experiment(exp_name)
 
-	centroid_matrix = np.vstack(centroids.values)
-	log.info("MINIMAL LOGGING: centroids computed")
-	with open(log_output, "a", encoding="utf-8") as f:
-		f.write("MINIMAL LOGGING: centroids computed\n")
-	# -------------------------
-	# 5. Meta-clustering (KMeans → 10 clusters)
-	# -------------------------
-	log.info(f"MINIMAL LOGGING: starting KMeans Meta-clustering with n_clusters = {n_clusters}")
-	with open(log_output, "a", encoding="utf-8") as f:
-		f.write(f"MINIMAL LOGGING: starting KMeans Meta-clustering with n_clusters = {n_clusters}\n")
-	kmeans = KMeans(n_clusters=n_clusters, random_state=42)
-	meta_topics = kmeans.fit_predict(centroid_matrix)
-	log.info("MINIMAL LOGGING: Meta-clustering complete")
-	with open(log_output, "a", encoding="utf-8") as f:
-		f.write("MINIMAL LOGGING: Meta-clustering complete\n")
-	# mapping topic initial → meta-topic
-	topic_to_meta = dict(zip(centroids.index, meta_topics))
+    os.makedirs(output_dir, exist_ok=True)
 
-	# -------------------------
-	# 6. Attribution des meta-topics aux documents
-	# -------------------------
-	df["meta_topic"] = df["topic"].map(topic_to_meta)
+    logdir = os.path.dirname(log_output)
+    os.makedirs(logdir, exist_ok=True)
 
-	# outliers (-1) → optionnel
-	df["meta_topic"] = df["meta_topic"].fillna(-1)
-	
-	log.info("MINIMAL LOGGING: Starting c-TF-IDF labeling for meta-clusters")
-	with open(log_output, "a", encoding="utf-8") as f:
-		f.write("MINIMAL LOGGING: Starting c-TF-IDF labeling for meta-clusters\n")
+    def write_log(message):
+        log.info(message)
+        with open(log_output, "a", encoding="utf-8") as f:
+            f.write(message + "\n")
 
-	# -------------------------
-	# 7. Attribution des noms de clusters
-	# -------------------------
-	### functions
-	def extract_top_words_per_cluster(tfidf_matrix, feature_names, top_n=5):
-		labels = {}
-		for i in range(tfidf_matrix.shape[0]):
-			row = tfidf_matrix[i].toarray().flatten()
-			top_indices = row.argsort()[-top_n:][::-1]
-			labels[i] = [feature_names[j] for j in top_indices]
-		return labels
+    write_log("Loading processed dataset")
 
-	def format_label(meta_topic):
-		if meta_topic == -1 or meta_topic not in meta_labels:
-			return "outlier"
-		return " | ".join(meta_labels[meta_topic])
-	###
-	
-	# 7.1. Construction des "documents" par meta-cluster
-	meta_docs = (
-		df[df.meta_topic != -1]
-		.groupby("meta_topic")["doc"]
-		.apply(lambda docs: " ".join(docs))
-	)
+    df_processed = pd.read_csv(filepath, sep=sep)
 
-	# Sécurité : vérifier qu'on a des clusters
-	if len(meta_docs) == 0:
-		log.warning("No meta-clusters found for labeling")
-		meta_labels = {}
-	else:
-		# 7.2. Vectorizer adapté au français
-		french_stopwords = list(STOP_WORDS)
-		vectorizer = CountVectorizer(
-			stop_words=french_stopwords,
-			ngram_range=(1, 2),
-			min_df=5
-		)
+    documents = df_processed[colname].astype(str).tolist()
 
-		X = vectorizer.fit_transform(meta_docs)
+    device = "cuda" if gpu_accel else "cpu"
 
-		# 7.3. c-TF-IDF (implémentation officielle BERTopic)
-		ctfidf_model = ClassTfidfTransformer()
-		c_tf_idf = ctfidf_model.fit_transform(X)
+    write_log(f"Loading SentenceTransformer: {sentenceTransformer}")
 
-		feature_names = vectorizer.get_feature_names_out()
+    embedding_model = SentenceTransformer(
+        sentenceTransformer,
+        device=device
+    )
 
-		# 7.4. Extraction des top mots par meta-cluster
-		meta_labels = extract_top_words_per_cluster(
-			c_tf_idf, feature_names, top_n=5
-		)
+    write_log("Computing embeddings")
 
-	# 7.5. Mapping meta_topic -> label texte
-	
-	df["meta_label"] = df["meta_topic"].apply(format_label)
+    embeddings = embedding_model.encode(
+        documents,
+        batch_size=64,
+        show_progress_bar=True
+    )
 
-	log.info("MINIMAL LOGGING: Meta-cluster labeling complete")
-	with open(log_output, "a", encoding="utf-8") as f:
-		f.write("MINIMAL LOGGING: Meta-cluster labeling complete\n")
-	# -------------------------
-	# 8. Résultat final
-	# -------------------------
-	log.info(f"MINIMAL LOGGING: label and size of Meta-clusters:\n{df['meta_label'].value_counts()}")
-	with open(log_output, "a", encoding="utf-8") as f:
-		f.write(f"MINIMAL LOGGING: label and size of Meta-clusters:\n{df['meta_label'].value_counts()}\n")
-	# -------------------------
-	# 9. Sauvegarde du modèle et de données labellisées
-	# -------------------------
-	log.info("Saving outputs")
-	with open(log_output, "a", encoding="utf-8") as f:
-		f.write("Saving outputs\n")
+    write_log("Training BERTopic")
 
-	datadir = os.path.dirname(data_output)
-	os.makedirs(datadir, exist_ok=True)
-	
-	modeldir = os.path.dirname(model_output)
-	os.makedirs(modeldir, exist_ok=True)
-	
-	df.to_csv(data_output, index=False)
-	
-	topic_model.save(model_output, serialization="safetensors")
-	
-	joblib.dump(kmeans, f"{model_output}_kmeans.pkl")
-	joblib.dump(meta_labels, f"{model_output}_meta_labels.pkl")
-	joblib.dump(topic_to_meta, f"{model_output}_topic_to_meta.pkl")
-	joblib.dump(embeddings, f"{model_output}_embeddings.pkl")
-	
-	### @@@ MLflow @@@ Store information in tracking server
-	with mlflow.start_run(run_name=run_name) as run:
-		run_id = run.info.run_id
-		with open("models/last_run_id.txt", "w", encoding="utf-8") as f:
-			f.write(run_id)
-		mlflow.log_params({
-			"sentence_transformer": sentenceTransformer,
-			"n_clusters": n_clusters,
-			"sep": sep,
-			"colname": colname
-		})
-		mlflow.log_metric("n_documents", len(df))
-		mlflow.log_metric("n_topics", len(set(topics)) - (1 if -1 in topics else 0))
-		mlflow.log_metric("n_meta_clusters", n_clusters)
-		mlflow.log_metric("number_of_outliers", len(df.loc[df['meta_topic'] == -1]))
-		
-		mlflow.log_artifacts(model_output, artifact_path=artifact_path)
-		mlflow.log_artifact(data_output, artifact_path=artifact_path)
-	
-def _cli():
-    parser = argparse.ArgumentParser(
-            description=__doc__,
-            formatter_class=argparse.ArgumentDefaultsHelpFormatter,
-            argument_default=argparse.SUPPRESS)
-    parser.add_argument('-v', '--verbose', action='store_true', default=False, help="Boolean: activate verbose mode. Default is no verbose.")
-    parser.add_argument('-en', '--exp_name', default="Bertopic_Trustpilot", type=str, help="Name of MLFlow experiment.")
-    parser.add_argument('-rn', '--run_name', default="first_run", type=str, help="Name MLFlow run.")
-    parser.add_argument('-ap', '--artifact_path', default="bert_paraphrase_mpnetv2_trustpilot", type=str, help="Name of MLFlow artifact path.")
-    parser.add_argument('-f', '--filepath', default="data/processed.csv", type=str, help="path to your input csv file of processed dataset")
-    parser.add_argument('-s', '--sep', default=',', type=str, help="separator to parse input csv")
-    parser.add_argument('-cn', '--colname', default="commentaire", type=str, help="Column name in processed data dataframe to use for embeddings")
-    parser.add_argument('-st', '--sentenceTransformer', default="paraphrase-multilingual-mpnet-base-v2", type=str, help="Name of sentenceTransformer model to use in BERTopic")
-    parser.add_argument('-nc', '--n_clusters', default=10, type=int, help="Number of final clusters")
-    parser.add_argument('-mo', '--model_output', default="models/BERTopic", type=str, help="Name of output file for model.")
-    parser.add_argument('-do', '--data_output', default="data/clusterized.csv", type=str, help="Name of output file for clusterized data.")
-    parser.add_argument('-lo', '--log_output', default="models/minimal.log", type=str, help="Name of output file for minimal logs.")
-    parser.add_argument('-gpu', '--gpu_accel', action='store_true', default=False, help="Boolean: Activate gpu acceleration; requires recent nvidia drivers. Default is False")    
-        
-    args = parser.parse_args()
-    
-    if args.verbose == True :
-        log.basicConfig(format="%(levelname)s: %(message)s", level=log.DEBUG)
-        log.info("Verbose output.")
+    topic_model = BERTopic(verbose=False)
+
+    topics, probs = topic_model.fit_transform(
+        documents,
+        embeddings
+    )
+
+    write_log("Computing centroids")
+
+    df = pd.DataFrame({
+        "doc": documents,
+        "topic": topics
+    })
+
+    df["embedding"] = list(embeddings)
+
+    centroids = (
+        df[df.topic != -1]
+        .groupby("topic")["embedding"]
+        .apply(lambda x: np.mean(np.vstack(x), axis=0))
+    )
+
+    centroid_matrix = np.vstack(centroids.values)
+
+    write_log("Training KMeans meta-clustering")
+
+    kmeans = KMeans(
+        n_clusters=n_clusters,
+        random_state=42,
+        n_init="auto"
+    )
+
+    meta_topics = kmeans.fit_predict(centroid_matrix)
+
+    topic_to_meta = dict(zip(centroids.index, meta_topics))
+
+    df["meta_topic"] = df["topic"].map(topic_to_meta)
+    df["meta_topic"] = df["meta_topic"].fillna(-1)
+
+    write_log("Generating c-TF-IDF labels")
+
+    meta_docs = (
+        df[df.meta_topic != -1]
+        .groupby("meta_topic")["doc"]
+        .apply(lambda docs: " ".join(docs))
+    )
+
+    if len(meta_docs) == 0:
+        meta_labels = {}
+
     else:
-        log.basicConfig(format="%(levelname)s: %(message)s")
+
+        vectorizer = CountVectorizer(
+            stop_words=list(STOP_WORDS),
+            ngram_range=(1, 2),
+            min_df=5
+        )
+
+        X = vectorizer.fit_transform(meta_docs)
+
+        ctfidf_model = ClassTfidfTransformer()
+
+        c_tf_idf = ctfidf_model.fit_transform(X)
+
+        feature_names = vectorizer.get_feature_names_out()
+
+        meta_labels = extract_top_words_per_cluster(
+            c_tf_idf,
+            feature_names,
+            top_n=5
+        )
+
+    def format_label(meta_topic):
+
+        if meta_topic == -1:
+            return "outlier"
+
+        if meta_topic not in meta_labels:
+            return "unknown"
+
+        return " | ".join(meta_labels[meta_topic])
+
+    df["meta_label"] = df["meta_topic"].apply(format_label)
+
+    write_log("Saving artifacts")
+
+    artifacts_dir = os.path.join(output_dir, "artifacts")
+
+    os.makedirs(artifacts_dir, exist_ok=True)
+
+    df.to_csv(
+        os.path.join(artifacts_dir, "clusterized.csv"),
+        index=False
+    )
+
+    np.save(
+        os.path.join(artifacts_dir, "embeddings.npy"),
+        embeddings
+    )
+
+    topic_model.save(
+        os.path.join(artifacts_dir, "bertopic_model"),
+        serialization="safetensors"
+    )
+
+    joblib.dump(
+        kmeans,
+        os.path.join(artifacts_dir, "kmeans.pkl")
+    )
+
+    joblib.dump(
+        meta_labels,
+        os.path.join(artifacts_dir, "meta_labels.pkl")
+    )
+
+    joblib.dump(
+        topic_to_meta,
+        os.path.join(artifacts_dir, "topic_to_meta.pkl")
+    )
+
+    config = {
+        "sentence_transformer": sentenceTransformer,
+        "n_clusters": n_clusters
+    }
+
+    with open(
+        os.path.join(artifacts_dir, "config.json"),
+        "w",
+        encoding="utf-8"
+    ) as f:
+        json.dump(config, f, indent=4)
+
+    with mlflow.start_run(run_name=run_name) as run:
+
+        run_id = run.info.run_id
+
+        with open(
+            os.path.join(output_dir, "last_run_id.txt"),
+            "w",
+            encoding="utf-8"
+        ) as f:
+            f.write(run_id)
+
+        mlflow.log_params(config)
+
+        mlflow.log_metric(
+            "n_documents",
+            len(df)
+        )
+
+        mlflow.log_metric(
+            "n_topics",
+            len(set(topics)) - (1 if -1 in topics else 0)
+        )
+
+        mlflow.log_artifacts(
+            artifacts_dir,
+            artifact_path=artifacts_dir
+        )
+
+    write_log("Training complete")
+
+
+def _cli():
+
+    parser = argparse.ArgumentParser()
+
+    parser.add_argument("-v", "--verbose", action="store_true")
+
+    parser.add_argument(
+        "-en",
+        "--exp_name",
+        default="Bertopic_Trustpilot_v4"
+    )
+
+    parser.add_argument(
+        "-rn",
+        "--run_name",
+        default="first_run"
+    )
+
+    parser.add_argument(
+        "-f",
+        "--filepath",
+        default="data/avis_bertopic.csv"
+    )
+
+    parser.add_argument(
+        "-s",
+        "--sep",
+        default=","
+    )
+
+    parser.add_argument(
+        "-cn",
+        "--colname",
+        default="commentaire"
+    )
+
+    parser.add_argument(
+        "-st",
+        "--sentenceTransformer",
+        default="paraphrase-multilingual-MiniLM-L12-v2"
+    )
+
+    parser.add_argument(
+        "-nc",
+        "--n_clusters",
+        default=10,
+        type=int
+    )
+
+    parser.add_argument(
+        "-o",
+        "--output_dir",
+        default="models"
+    )
+
+    parser.add_argument(
+        "-lo",
+        "--log_output",
+        default="logs/train.log"
+    )
+
+    parser.add_argument(
+        "-gpu",
+        "--gpu_accel",
+        action="store_true"
+    )
+
+    args = parser.parse_args()
+
+    if args.verbose:
+        log.basicConfig(level=log.INFO)
 
     return vars(args)
 
-if __name__ == '__main__':
+
+if __name__ == "__main__":
     main(**_cli())
 
