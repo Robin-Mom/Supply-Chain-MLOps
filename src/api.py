@@ -264,7 +264,7 @@ def health():
 # ---------------------------------------------------------
 
 @app.post("/predict0", response_model=PredictResponse,  tags=["MLOps"], summary="🚀 Prédiction du model")
-async def predict_endpoint(data: AvisInput):
+async def predict_endpoint0(data: AvisInput):
 
     try:
 
