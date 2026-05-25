@@ -1,8 +1,11 @@
 from fastapi import FastAPI, HTTPException, BackgroundTasks
-import subprocess
 from pydantic import BaseModel
+import subprocess
 import joblib
+import dagshub
+import mlflow
 from sentence_transformers import SentenceTransformer
+from mlflow.tracking import MlflowClient
 import numpy as np
 import os
 import json
@@ -13,18 +16,98 @@ from fastapi.responses import Response, FileResponse
 from prometheus_client import CollectorRegistry, Gauge, push_to_gateway
 from numpy import random
 # ---------------------------------------------------------
-# CONFIGURATION & CHARGEMENT (Allégé)
+# CONFIGURATION & CHARGEMENT
 # ---------------------------------------------------------
 
-
 # Chemins vers les artefacts
+MODEL_NAME = "trustpilot_bertopic_v4"
+METRICS_PATH = "metrics/best_score.json"
+
 MODEL_PATH = "models/BERTopic"
 KMEANS_PATH = MODEL_PATH + "_kmeans.pkl"
 LABELS_PATH = MODEL_PATH + "_meta_labels.pkl"
 METRICS_PATH = "metrics/silhouette.json"
 ST_MODEL_NAME = "paraphrase-multilingual-mpnet-base-v2"
 
-kmeans, meta_labels, embedding_model = None, None, None
+# ---------------------------------------------------------
+# GLOBAL VARIABLES
+# ---------------------------------------------------------
+kmeans, meta_labels, embedding_model, current_model_version,current_model_uri   = None, None, None, None, None
+
+# ---------------------------------------------------------
+# MLflow / DagsHub INIT
+# ---------------------------------------------------------
+token = os.getenv("DAGSHUB_USER_TOKEN")
+
+if token is None:
+    raise Exception("DAGSHUB_USER_TOKEN missing")
+
+dagshub.init(
+    repo_owner='schmilblick-ai',
+    repo_name='Supply-Chain-MLOps',
+    mlflow=True
+)
+
+
+# ---------------------------------------------------------
+# MODEL LOADING
+# ---------------------------------------------------------
+
+def load_latest_production_model():
+
+    global kmeans
+    global meta_labels
+    global embedding_model
+    global current_model_version
+    global current_model_uri
+
+    client = MlflowClient()
+
+    versions = client.get_latest_versions( MODEL_NAME, stages=["Production"] )
+
+    if len(versions) == 0:
+        raise Exception( f"No Production model found for '{MODEL_NAME}'" )
+
+    latest_model = versions[0]
+
+    model_version = latest_model.version
+    artifact_uri = latest_model.source
+
+    print(f"Loading Production model v{model_version}")
+    print(f"Artifact URI: {artifact_uri}")
+
+    local_path = mlflow.artifacts.download_artifacts(
+        artifact_uri=artifact_uri
+    )
+
+    # ---------------------------------------------------------
+    # LOAD CONFIG
+    # ---------------------------------------------------------
+
+    config_path = os.path.join(local_path,"config.json" )
+
+    with open(config_path, "r", encoding="utf-8") as f:
+        config = json.load(f)
+
+    st_model_name = config["sentence_transformer"]
+
+    # ---------------------------------------------------------
+    # LOAD ARTIFACTS
+    # ---------------------------------------------------------
+
+    kmeans = joblib.load(os.path.join(local_path, "kmeans.pkl"))
+    meta_labels = joblib.load(os.path.join(local_path, "meta_labels.pkl"))
+    embedding_model = SentenceTransformer(st_model_name)
+
+    current_model_version = model_version
+    current_model_uri = artifact_uri
+
+    print("✅ Production model successfully loaded")
+
+
+# ---------------------------------------------------------
+# STARTUP EVENT - via asynccontextmanager
+# ---------------------------------------------------------
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
@@ -32,9 +115,7 @@ async def lifespan(app: FastAPI):
     global kmeans,meta_labels,embedding_model
     # Chargement des artefacts au démarrage
     try:
-        kmeans = joblib.load(KMEANS_PATH)
-        meta_labels = joblib.load(LABELS_PATH)
-        #embedding_model = SentenceTransformer(ST_MODEL_NAME)
+        load_latest_production_model()
         print("✅ API prête : Inférence directe via KMeans chargée.")
     except Exception as e:
         print(f"❌ Erreur de chargement des artefacts : {e}")
@@ -47,8 +128,8 @@ async def lifespan(app: FastAPI):
 
 app = FastAPI(lifespan=lifespan,
     title="Oscaro Trustpilot API - Direct Meta-Clustering",
-    description="API optimisée : Embedding -> KMeans Meta-Topic",
-    version="1.3.0"
+    description="API optimisée : Embedding -> KMeans Meta-Topic -> MLFlow Registry -> nginx",
+    version="2.0.1"
 )
 
 # ---------------------------------------------------------
@@ -62,7 +143,7 @@ class PredictResponse(BaseModel):
     text: str
     meta_topic: int
     meta_label: str
-
+    model_version: str
 
 @app.get("/favicon.ico", include_in_schema=False)
 async def favicon():
@@ -70,17 +151,21 @@ async def favicon():
     response.headers["Cache-Control"] = "no-cache, no-store" 
     return response
 
-@app.get("/", tags=["Toolbox"], summary="🏡 tester le home")
+@app.get("/", tags=["Toolbox"], summary="🏡 Home et Context du model")
 def home():
-    return {"status": "online", "method": "Direct KMeans Inference"}
+    return {
+        "status": "online",
+        "model_name": MODEL_NAME,
+        "model_version": current_model_version
+    }
 
 # Health check qui vérifie que le modèle est bien chargé
 @app.get("/health", tags=["Toolbox"], summary="💖🩺 Santé du serveur")
 def health():
     #tempo config health check switch if embedding_model is None:
-    if kmeans is None:
+    if embedding_model is None:
         return Response(status_code=503, content="embedding_model not loaded")
-    return {"status": "ok", "model": "loaded"}
+    return {"status": "healthy", "model": "loaded", "model_version": current_model_version}
 
 
 # ---------------------------------------------------------
