@@ -58,50 +58,113 @@ stages:
       size: 24591821
     - path: src/train.py
       hash: md5
-      md5: 3453036544463ef0d94ecdfa023cb843
-      size: 11077
+      md5: 29a23adcd2103f38acf35dd40274116e
+      size: 6839
     outs:
-    - path: data/clusterized.csv
+    - path: models/c5/artifacts
       hash: md5
-      md5: 011b61d479214974f5d04e6eaa3afc1e
-      size: 50113708
-    - path: models/BERTopic
-      hash: md5
-      md5: 61a216f4b85d8d305e18349514fa14b6.dir
-      size: 287299
-      nfiles: 3
-    - path: models/BERTopic_embeddings.pkl
-      hash: md5
-      md5: 65f5dbcb0fc4692f588440d77e4f8710
-      size: 12288241
-    - path: models/BERTopic_kmeans.pkl
-      hash: md5
-      md5: 7ac29b31b319e7f6ed321864d16ad880
-      size: 31711
-    - path: models/BERTopic_meta_labels.pkl
-      hash: md5
-      md5: 89f1f9146359f69c31ef45bf725e3d56
-      size: 502
-    - path: models/BERTopic_topic_to_meta.pkl
-      hash: md5
-      md5: 02d0418c119c8a33dde011de137da8ee
-      size: 1224
-  evaluate:
-    cmd: python src/evaluate.py --filepath data/clusterized.csv --metrics_output
-      metrics/silhouette.json
+      md5: 5c0e76a42e7185ec46ae260dceced402.dir
+      size: 298520179
+      nfiles: 9
+  train@c10:
+    cmd: python src/train.py -v -nc 10 -o models/c10
     deps:
-    - path: data/clusterized.csv
+    - path: data/avis_bertopic.csv
       hash: md5
-      md5: 011b61d479214974f5d04e6eaa3afc1e
-      size: 50113708
+      md5: 004c6d552a699965607d010e4722e0c2
+      size: 24591821
+    - path: src/train.py
+      hash: md5
+      md5: 29a23adcd2103f38acf35dd40274116e
+      size: 6839
+    outs:
+    - path: models/c10/artifacts
+      hash: md5
+      md5: 5bfffbf2be4f20387f4921811c02642b.dir
+      size: 298465434
+      nfiles: 9
+  train@c15:
+    cmd: python src/train.py -v -nc 15 -o models/c15
+    deps:
+    - path: data/avis_bertopic.csv
+      hash: md5
+      md5: 004c6d552a699965607d010e4722e0c2
+      size: 24591821
+    - path: src/train.py
+      hash: md5
+      md5: 29a23adcd2103f38acf35dd40274116e
+      size: 6839
+    outs:
+    - path: models/c15/artifacts
+      hash: md5
+      md5: 3ab5c7f16a337fa9a2480925b8607837.dir
+      size: 298565332
+      nfiles: 9
+  evaluate@c5:
+    cmd: python src/evaluate.py -v -f models/c5/artifacts/clusterized.csv -ri 
+      models/c5/last_run_id.txt -ap models/c5/artifacts -mo 
+      metrics/c5/silhouette.json
+    deps:
+    - path: models/c5/artifacts/clusterized.csv
+      hash: md5
+      md5: d9c61dd879c91fdb643310a010dee734
+      size: 235876305
+    - path: models/c5/last_run_id.txt
+      hash: md5
+      md5: 1d66f53f92651549dd80ce05cd82472e
+      size: 32
     - path: src/evaluate.py
       hash: md5
-      md5: 11b36974908196faf79cfa13844240fd
-      size: 4829
+      md5: f49996fdae6f5d4e566b9f33404321ae
+      size: 5163
     outs:
-    - path: metrics/silhouette.json
+    - path: metrics/c5/silhouette.json
       hash: md5
-      md5: 9215e25ac3fd3eccead560279e891acc
+      md5: 6fedd64d9958acdc62341ae5ba958c6e
+      size: 47
+  evaluate@c10:
+    cmd: python src/evaluate.py -v -f models/c10/artifacts/clusterized.csv -ri 
+      models/c10/last_run_id.txt -ap models/c10/artifacts -mo 
+      metrics/c10/silhouette.json
+    deps:
+    - path: models/c10/artifacts/clusterized.csv
+      hash: md5
+      md5: b6e3e30b575fc53132cb227e80c103ff
+      size: 235824481
+    - path: models/c10/last_run_id.txt
+      hash: md5
+      md5: 6b97172b8b0739fb8e07490f804f4695
+      size: 32
+    - path: src/evaluate.py
+      hash: md5
+      md5: f49996fdae6f5d4e566b9f33404321ae
+      size: 5163
+    outs:
+    - path: metrics/c10/silhouette.json
+      hash: md5
+      md5: 86a3fbc99cfd794eb8d2d91de5d1d15b
+      size: 48
+  evaluate@c15:
+    cmd: python src/evaluate.py -v -f models/c15/artifacts/clusterized.csv -ri 
+      models/c15/last_run_id.txt -ap models/c15/artifacts -mo 
+      metrics/c15/silhouette.json
+    deps:
+    - path: models/c15/artifacts/clusterized.csv
+      hash: md5
+      md5: 8860cf9c727051b77cf2ac2395fa02ab
+      size: 235866903
+    - path: models/c15/last_run_id.txt
+      hash: md5
+      md5: afbfa7beadb122706edd9b3f729b5943
+      size: 32
+    - path: src/evaluate.py
+      hash: md5
+      md5: f49996fdae6f5d4e566b9f33404321ae
+      size: 5163
+    outs:
+    - path: metrics/c15/silhouette.json
+      hash: md5
+      md5: 164a271488e1a2b8e5e6fdc49fe3677f
       size: 47
   mergInc:
     cmd: python -c "from src.collect import merge_avis; merge_avis()"
