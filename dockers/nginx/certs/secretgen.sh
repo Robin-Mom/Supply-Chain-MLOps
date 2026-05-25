@@ -86,6 +86,11 @@ extendedKeyUsage = serverAuth
 [ alt_names ]
 DNS.1 = localhost
 DNS.2 = ${DOMAIN}     # ← nom DNS /etc/hosts
+DNS.3 = LIORA-VM-38Gi
+DNS.4 = LIORA-VM-77GI
+DNS.41 = LIORA_VM_77Gi
+DNS.42 = LIORAVM77GI
+DNS.5 = LIORA-VM-15Gi
 IP.1  = 127.0.0.1
 #IP.2  = ${SERVER_IP}  # ← IP privée fixe - mais ne sert à rien
 EOF
