@@ -1,0 +1,6 @@
+# docker-compose.yml
+include:
+  - dockers/nginx/docker-compose.yaml
+#  - dockers/airflow/docker-compose.yaml
+  - dockers/slim/docker-compose.yaml
+#  - dockers/mlflow/docker-compose.yaml

@@ -45,6 +45,47 @@ with DAG(
     bash_command="cd ./ltteloc && dvc repro",
     )
 
+    if False:
+        #autre appel possible
+        #vérifier aussi ce que
+        from airflow.providers.docker.operators.docker import DockerOperator
+
+        dans le train, trace output des metrics ou score
+        # dans ton script Python :
+        import json
+        theSilScore=0.72
+        print(json.dumps({"silhouette_score": theSilScore}))  # ← stdout capturé par Airflow
+
+        train_task = DockerOperator(
+            task_id="train_model",
+            image="mlopsv-app",          # ← la même image ✅
+            command="dvc repro --force",
+            volumes=["/app:/app"],
+            auto_remove=True,            # ← conteneur supprimé après ✅
+            do_xcom_push=True,          # ← capture stdout dans XCom ✅
+            dag=dag,
+        )
+
+        # 3. Tâche suivante lit le score
+        def log_score(**context):
+            output = context["ti"].xcom_pull(task_ids="train_model")
+            score = json.loads(output)["silhouette_score"]
+            print(f"Silhouette score : {score}")
+
+        log_task = PythonOperator(
+            task_id="log_score",
+            python_callable=log_score,
+            dag=dag,
+        )        
+        from airflow.operators.bash import BashOperator
+
+        train_task = BashOperator(
+            task_id="train_model",
+            bash_command="docker compose -p mlopsv run --rm trainer",
+            dag=dag,
+        )
+
+
     push = BashOperator(
     task_id="push",
     bash_command="dvc push", #on est à la racine du projet ou il y a le dossier .dvc

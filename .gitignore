@@ -37,3 +37,21 @@ logs/
 .dvc/config.local
 .dvc/cache/
 .dvc/tmp/
+
+
+# ======================
+# Nginx - Certificats SSL
+# ======================
+#dockers/nginx/certs/
+# ou plus fin si tu veux garder le dossier vide dans git
+dockers/nginx/certs/*.key
+dockers/nginx/certs/*.crt
+dockers/nginx/certs/*.csr
+dockers/nginx/certs/*.srl
+dockers/nginx/certs/*.pem
+
+# ======================
+# Nginx - Authentification
+# ======================
+dockers/nginx/.htpasswd
+dockers/nginx/.htpasswd.*

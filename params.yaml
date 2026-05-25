@@ -1,5 +1,9 @@
+mergeInc:
+  source: "avis_40k"
+  increm: "avis_28k"
+  output: "avis_45k"
 collect:
   source: "avis_45k"
   mode: "bulk"            # "incremental" ou "bulk" ou "predict" attention 
   period_sta: "P202401"   # en incremental : juste les nouveaux sont ajoutés, en predict on batch qu'un petit bout
-  period_end: "P202603"
+  period_end: "P202603"   # en bulk on fait tout
