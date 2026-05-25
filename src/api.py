@@ -172,7 +172,7 @@ def health():
 # ENDPOINTS DE PREDICTION
 # ---------------------------------------------------------
 
-@app.post("/predict", response_model=PredictResponse,  tags=["MLOps"], summary="🚀 Prédiction du model")
+@app.post("/predict0", response_model=PredictResponse,  tags=["MLOps"], summary="🚀 Prédiction du model")
 async def predict_endpoint(data: AvisInput):
     """
     Reproduction exacte de la logique de predict.py
