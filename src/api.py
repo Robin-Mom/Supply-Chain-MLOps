@@ -304,7 +304,7 @@ async def trigger_train(background_tasks: BackgroundTasks):
         try:
             # On lance dvc repro comme tu le ferais dans le terminal
             result = subprocess.run(
-                ["dvc", "repro"], 
+                ["dvc", "repro", "--force"], 
                 capture_output=True, 
                 text=True, 
                 check=True
@@ -318,7 +318,7 @@ async def trigger_train(background_tasks: BackgroundTasks):
     
     return {
         "status": "Training started",
-        "message": "Le pipeline DVC a été lancé en arrière-plan. Vérifie les logs du serveur pour le suivi."
+        "message": "DVC pipeline launched in background. Please check logs with follow up server."
     }
 
 # ---------------------------------------------------------
