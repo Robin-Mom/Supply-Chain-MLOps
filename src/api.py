@@ -119,6 +119,91 @@ async def predict_endpoint(data: AvisInput):
         raise HTTPException(status_code=500, detail=str(e))
 
 
+@app.post("/predict",  response_model=PredictResponse,  tags=["MLOps"], summary="🚀 Prédiction du model NEW")
+async def predict_endpoint(data: AvisInput):
+
+    try:
+
+        if embedding_model is None:
+            raise HTTPException(
+                status_code=500,
+                detail="No production model loaded"
+            )
+
+        if not data.commentaire.strip():
+            raise HTTPException(
+                status_code=400,
+                detail="Empty comment"
+            )
+
+        # ---------------------------------------------------------
+        # EMBEDDING
+        # ---------------------------------------------------------
+
+        embedding = embedding_model.encode(
+            [data.commentaire]
+        )
+
+        # ---------------------------------------------------------
+        # META-CLUSTER PREDICTION
+        # ---------------------------------------------------------
+
+        meta_topic = int(
+            kmeans.predict(embedding)[0]
+        )
+
+        # ---------------------------------------------------------
+        # LABEL
+        # ---------------------------------------------------------
+
+        if meta_topic in meta_labels:
+
+            label = " | ".join(
+                meta_labels[meta_topic]
+            )
+
+        else:
+
+            label = "unknown"
+
+        return {
+            "text": data.commentaire,
+            "meta_topic": meta_topic,
+            "meta_label": label,
+            "model_version": str(current_model_version)
+        }
+
+    except HTTPException:
+        raise
+
+    except Exception as e:
+
+        raise HTTPException(
+            status_code=500,
+            detail=str(e)
+        )
+
+# ---------------------------------------------------------
+# RELOAD MODEL
+# ---------------------------------------------------------
+@app.post("/reload_model", tags=["MLOps"], summary="🚚 Rechargement du model")
+async def reload_model():
+
+    try:
+
+        load_latest_production_model()
+
+        return {
+            "status": "success",
+            "model_version": current_model_version
+        }
+
+    except Exception as e:
+
+        raise HTTPException(
+            status_code=500,
+            detail=str(e)
+        )
 
 # ---------------------------------------------------------
 # ENDPOINTS D'ENTRAÎNEMENT (DVC)
@@ -155,7 +240,7 @@ async def trigger_train(background_tasks: BackgroundTasks):
 # ENDPOINTS DE MONITORING & MÉTRIQUES
 # ---------------------------------------------------------
 
-@app.get("/metrics", tags=["MLOps"], summary="🔎 Metriques du model")
+@app.get("/metrics", tags=["MLOps"], summary="🔎 Metriques du model et test promotheus PushGateway")
 def get_metrics():
     """Retourne le score de silhouette calculé lors de l'évaluation
        Et Push le score silhouette dans les metrics pour grafan via pushgateway prometheus
@@ -181,6 +266,3 @@ def get_metrics():
         )
 
         return data
-
-
-
