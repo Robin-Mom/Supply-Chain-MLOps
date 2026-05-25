@@ -33,6 +33,7 @@ Créez un fichier .env à la racine (non suivi par Git) :
     MLFLOW_TRACKING_URI=https://dagshub.com/votre-username/Supply-Chain-MLOps.mlflow
     MLFLOW_TRACKING_USERNAME=votre-username
     MLFLOW_TRACKING_PASSWORD=votre-token-dagshub
+    DAGSHUB_USER_TOKEN=votre-token-dagshub
 
 3. Synchronisation
 Avant de lancer l'infrastructure, récupérez le code et les fichiers lourds :
@@ -40,6 +41,10 @@ Avant de lancer l'infrastructure, récupérez le code et les fichiers lourds :
     Bash
     git pull origin main
     dvc pull
+4. précautions supplémentaires pour éviter les bugs avec docker-compose v1 avant de lancer le build:
+
+    docker-compose down --volumes --remove-orphans
+    docker system prune -af
 
 ## 🏗️ Étapes Globales du Pipeline
 
