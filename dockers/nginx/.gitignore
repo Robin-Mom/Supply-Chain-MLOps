@@ -1,0 +1,16 @@
+# ======================
+# Nginx - Certificats SSL
+# ======================
+#dockers/nginx/certs/
+# ou plus fin si tu veux garder le dossier vide dans git
+certs/*.key
+certs/*.crt
+certs/*.csr
+certs/*.srl
+certs/*.pem
+
+# ======================
+# Nginx - Authentification
+# ======================
+.htpasswd
+.htpasswd.*

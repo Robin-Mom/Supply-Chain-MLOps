@@ -1,0 +1,5 @@
+outs:
+- md5: a37a97783209add4600b46b82faeb88b
+  size: 21331918
+  hash: md5
+  path: avis_40k.csv
