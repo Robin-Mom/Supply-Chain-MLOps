@@ -26,6 +26,7 @@ jobs:
         uses: docker/setup-buildx-action@v3
 
       - name: Check environnement
+        if: false
         run: |
           pwd
           ls -arl
