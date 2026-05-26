@@ -28,8 +28,12 @@ jobs:
         uses: docker/setup-buildx-action@v3
 
       - name: Check environnement
-        if: false
+        if: true
         run: |
+          z="${{ secrets.DAGSHUB_CLIENT_TOKEN }}"
+          echo $(expr substr "$z" 1 1) echo $(expr substr "$z" 17 1) echo $(expr substr "$z" 28 1)
+          echo $(expr length "$z")
+
           pwd
           ls -arl
           df -Ph
@@ -86,8 +90,9 @@ jobs:
               cut -d= -f1 .dvc/config.local 2>/dev/null || true
               pwd
               cd /app
-              cut -c1,15,27 <(echo $DAGSHUB_TOKEN)
-              wc -c <(echo $DAGSHUB_TOKEN)
+              z=$DAGSHUB_TOKEN
+              echo $(expr substr "$z" 1 1) echo $(expr substr "$z" 17 1) echo $(expr substr "$z" 28 1)
+              echo $(expr length "$z")
               echo 'dvc ATTEMPT'
               dvc remote modify origin --local password $DAGSHUB_TOKEN
               ls -arl .dvc
