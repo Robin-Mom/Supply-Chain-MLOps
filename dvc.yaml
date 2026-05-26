@@ -49,6 +49,7 @@ stages:
         - src/train.py
       outs:
         - models/${key}/artifacts
+        - models/${key}/last_run_id.txt
   evaluate:
     foreach: ${cluster_values}
     do:

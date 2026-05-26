@@ -48,9 +48,8 @@ stages:
       hash: md5
       md5: 004c6d552a699965607d010e4722e0c2
       size: 24591821
-  train:
-    cmd: bash -c 'python src/train.py --filepath data/avis_bertopic.csv 
-      --model_output models/BERTopic  $TRAIN_ARGS'
+  train@c5:
+    cmd: python src/train.py -v -nc 5 -o models/c5
     deps:
     - path: data/avis_bertopic.csv
       hash: md5
