@@ -17,7 +17,7 @@ jobs:
       - name: Free Disk Space (Ubuntu Runner)
         run: |
           whoami
-          id ubuntu
+          id ubuntu && true
           sudo rm -rf /usr/share/dotnet
           sudo rm -rf /usr/local/lib/android
           sudo rm -rf /opt/ghc
