@@ -78,12 +78,15 @@ jobs:
               echo 'EXPLORING ENV FOR THE PULL'
               #dvc init --no-scm --force
               echo \$HOME
+              whoami
               ls -arl .dvc
-              cut -d= -f1 \$HOME/.dvc/config
-              cut -d= -f1 \$HOME/.dvc/config.local 2>/dev/null && true
+              cut -d= -f1 .dvc/config
+              cut -d= -f1 .dvc/config.local 2>/dev/null && true
               pwd
               cd /app
-              dvc remote modify origin --local password \$DAGSHUB_TOKEN
+              cut -c1-5 <<<$DAGSHUB_TOKEN
+              dvc remote modify origin --local password $DAGSHUB_TOKEN
+              ls -arl .dvc
               dvc pull -r origin
             "
 
