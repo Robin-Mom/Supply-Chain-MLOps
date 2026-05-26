@@ -83,12 +83,12 @@ jobs:
               whoami
               ls -arl .dvc
               cut -d= -f1 .dvc/config
-              cut -d= -f1 .dvc/config.local 2>/dev/null && true
+              cut -d= -f1 .dvc/config.local 2>/dev/null || true
               pwd
               cd /app
               cut -c1,15,27 <(echo $DAGSHUB_TOKEN)
               wc -c <(echo $DAGSHUB_TOKEN)
-              echo "$ THIS IS IT"|cut -c1-5
+              echo 'dvc ATTEMPT'
               dvc remote modify origin --local password $DAGSHUB_TOKEN
               ls -arl .dvc
               dvc pull -r origin
