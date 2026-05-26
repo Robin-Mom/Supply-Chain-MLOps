@@ -10,3 +10,4 @@ dagshub>=0.3.0
 dvc[http]>=3.0.0
 nltk>=3.8
 pytest>=7.0.0
+prometheus_client==0.25.0
