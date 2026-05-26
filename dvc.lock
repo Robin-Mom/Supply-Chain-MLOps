@@ -65,6 +65,10 @@ stages:
       md5: 5c0e76a42e7185ec46ae260dceced402.dir
       size: 298520179
       nfiles: 9
+    - path: models/c5/last_run_id.txt
+      hash: md5
+      md5: f5f78cf96045d9b8c0cf8bf3e3371919
+      size: 32
   train@c10:
     cmd: python src/train.py -v -nc 10 -o models/c10
     deps:
@@ -82,6 +86,10 @@ stages:
       md5: 5bfffbf2be4f20387f4921811c02642b.dir
       size: 298465434
       nfiles: 9
+    - path: models/c10/last_run_id.txt
+      hash: md5
+      md5: f5f78cf96045d9b8c0cf8bf3e3371919
+      size: 32
   train@c15:
     cmd: python src/train.py -v -nc 15 -o models/c15
     deps:
@@ -99,6 +107,10 @@ stages:
       md5: 3ab5c7f16a337fa9a2480925b8607837.dir
       size: 298565332
       nfiles: 9
+    - path: models/c15/last_run_id.txt
+      hash: md5
+      md5: f5f78cf96045d9b8c0cf8bf3e3371919
+      size: 32
   evaluate@c5:
     cmd: python src/evaluate.py -v -f models/c5/artifacts/clusterized.csv -ri 
       models/c5/last_run_id.txt -ap models/c5/artifacts -mo 
