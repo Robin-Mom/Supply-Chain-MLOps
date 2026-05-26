@@ -73,7 +73,7 @@ jobs:
             "
       - name: Pull Data and Models from DVC 2
         run: |
-          docker compose run --rm -e DAGSHUB_TOKEN="${{ secrets.DAGSHUB_CLIENT_TOKEN }}" 
+          docker compose run --rm -e DAGSHUB_TOKEN="${{ secrets.DAGSHUB_CLIENT_TOKEN }}" \
             trainer sh -c "
               echo 'EXPLORING ENV FOR THE PULL'
               #dvc init --no-scm --force
