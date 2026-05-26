@@ -35,8 +35,6 @@ jobs:
           which git
           echo $PATH
           grep -a2 "last_run_id" dvc.lock|grep md5:
-          cd /app
-          grep -a2 "last_run_id" dvc.lock|grep md5:
           dvc remote add -d --force origin https://dagshub.com/schmilblick-ai/Supply-Chain-MLOps.dvc
           dvc remote modify origin auth basic
           dvc remote modify origin user marv1-ops
