@@ -43,7 +43,7 @@ jobs:
           bash -c "echo $XXX \$XXX"
           bash -c 'echo $XXX \$XXX'
           DAGSHUB_TOKEN=${{ secrets.DAGSHUB_CLIENT_TOKEN }}
-          bash -c "dvc remote modify origin password \$DAGSHUB_TOKEN"
+          dvc remote modify origin password $DAGSHUB_TOKEN
           dvc pull -r origin
 
       - name: Create .env file for Docker Compose
