@@ -50,6 +50,7 @@ jobs:
       # 🔐 CONFIGURATION ET PULL DVC AMÉLIORÉE
       # On injecte les secrets directement dans l'environnement du conteneur
       - name: Pull Data and Models from DVC
+        if: false
         run: |
           docker compose run --rm \
             -e DAGSHUB_TOKEN="${{ secrets.DAGSHUB_CLIENT_TOKEN }}" \
@@ -58,9 +59,17 @@ jobs:
               pwd
               cd /app
               grep -a2 "last_run_id" dvc.lock|grep md5:
-              dvc remote add -d origin https://dagshub.com/schmilblick-ai/Supply-Chain-MLOps.dvc
+              dvc remote add -d --force origin https://dagshub.com/schmilblick-ai/Supply-Chain-MLOps.dvc
               dvc remote modify origin auth basic
               dvc remote modify origin user marv1-ops
+              dvc remote modify origin password \$DAGSHUB_TOKEN
+              dvc pull -r origin
+            "
+      - name: Pull Data and Models from DVC 2
+        run: |
+          docker compose run --rm \
+            -e DAGSHUB_TOKEN="${{ secrets.DAGSHUB_CLIENT_TOKEN }}" \
+            trainer sh -c "
               dvc remote modify origin password \$DAGSHUB_TOKEN
               dvc pull -r origin
             "
