@@ -40,11 +40,8 @@ jobs:
           dvc remote add -d --force origin https://dagshub.com/schmilblick-ai/Supply-Chain-MLOps.dvc
           dvc remote modify origin auth basic
           dvc remote modify origin user marv1-ops
-          export XXX=333
-          bash -c "echo $XXX \$XXX"
-          bash -c 'echo $XXX \$XXX'
-          DAGSHUB_TOKEN=${{ secrets.DAGSHUB_CLIENT_TOKEN }}
-          dvc remote modify origin password $DAGSHUB_TOKEN
+          DAGSHUB_USER_TOKEN=${{ secrets.DAGSHUB_CLIENT_TOKEN }}
+          dvc remote modify origin password $DAGSHUB_USER_TOKEN
           dvc pull -r origin
 
       - name: Create .env file for Docker Compose
@@ -77,9 +74,10 @@ jobs:
             "
       - name: Pull Data and Models from DVC 2
         run: |
-          docker compose run --rm \
+          docker compose run --rm trainer \
             -e DAGSHUB_TOKEN="${{ secrets.DAGSHUB_CLIENT_TOKEN }}" \
-            trainer sh -c "
+            bash -c "
+              pwd
               cd /app
               dvc remote modify origin password \$DAGSHUB_TOKEN
               dvc pull -r origin
@@ -87,7 +85,9 @@ jobs:
 
       - name: Run unit tests via Docker
         run: |
-          docker compose run --rm trainer pytest tests/
+          docker compose run --rm trainer \
+            -e DAGSHUB_USER_TOKEN="${{ secrets.DAGSHUB_CLIENT_TOKEN }}" \
+          pytest tests/
 
       - name: Build API Docker image
         run: |
