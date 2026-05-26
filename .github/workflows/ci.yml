@@ -35,7 +35,17 @@ jobs:
           which git
           echo $PATH
           grep -a2 "last_run_id" dvc.lock|grep md5:
-
+          cd /app
+          grep -a2 "last_run_id" dvc.lock|grep md5:
+          dvc remote add -d --force origin https://dagshub.com/schmilblick-ai/Supply-Chain-MLOps.dvc
+          dvc remote modify origin auth basic
+          dvc remote modify origin user marv1-ops
+          export XXX=333
+          bash -c "echo $XXX \$XXX"
+          bash -c 'cho $XXX \$XXX'
+          DAGSHUB_TOKEN=${{ secrets.DAGSHUB_CLIENT_TOKEN }}
+          bash -c "dvc remote modify origin password \$DAGSHUB_TOKEN"
+          dvc pull -r origin
 
       - name: Create .env file for Docker Compose
         run: |
@@ -70,6 +80,7 @@ jobs:
           docker compose run --rm \
             -e DAGSHUB_TOKEN="${{ secrets.DAGSHUB_CLIENT_TOKEN }}" \
             trainer sh -c "
+              cd /app
               dvc remote modify origin password \$DAGSHUB_TOKEN
               dvc pull -r origin
             "
