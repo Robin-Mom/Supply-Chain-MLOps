@@ -41,8 +41,7 @@ jobs:
           tags: img142:0.0
           cache-from: type=local,src=/tmp/.buildx-cache-142
           cache-to: type=local,dest=/tmp/.buildx-cache-142,mode=max
-        run: 
-          docker compose -f ${DOCKFLD}/docker-compose.yaml build common
+        run: docker compose -f ${DOCKFLD}/docker-compose.yaml build common
 
 
   test:
@@ -64,5 +63,4 @@ jobs:
           docker compose -p $(PROJECT) -f ${DOCKFLD}/docker-compose.yaml up -d api 
 
       - name: Run tests
-        run: 
-          docker compose -p $(PROJECT) -f ${DOCKFLD}/docker-compose.yaml run --rm trainer pytest tests/
+        run: docker compose -p $(PROJECT) -f ${DOCKFLD}/docker-compose.yaml run --rm trainer pytest tests/
