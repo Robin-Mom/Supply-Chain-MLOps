@@ -2,8 +2,8 @@ name: Supply CI parallel
 
 on:
   workflow_dispatch:    # ← tu contrôles manuellement
-  push:
-    branches: [ feat/nginx_2 ]   # ← ou sur ta branche de dev
+  #push:
+  #  branches: [ feat/nginx_2 ]   # ← ou sur ta branche de dev
 
 jobs:
   build-api:
