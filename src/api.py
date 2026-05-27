@@ -210,16 +210,14 @@ def load_latest_production_model():
 # ---------------------------------------------------------
 # STARTUP EVENT
 # ---------------------------------------------------------
-
-@app.on_event("startup")
-async def startup_event():
-
-    try:
-        load_latest_production_model()
-
-    except Exception as e:
-
-        print(f"❌ Error loading production model: {e}")
+#Old style et si présent attention on charge une deuxième fois le model !! voir lifespan
+if False:
+    @app.on_event("startup")
+    async def startup_event():
+        try:
+            load_latest_production_model()
+        except Exception as e:
+            print(f"❌ Error loading production model: {e}")
 
 
 # ---------------------------------------------------------

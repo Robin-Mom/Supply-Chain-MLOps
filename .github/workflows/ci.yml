@@ -80,7 +80,6 @@ jobs:
             sleep 3
           done
 
-      - name: Run unit tests depuis la vm - Après la synchro - api dispo
+      - name: Run unit tests - indifférement sur trainer ou api - Après la synchro - api dispo
         run: |
-          pip install pytest requests
-          pytest tests/
+          docker compose run --rm trainer pytest tests/

@@ -1,11 +1,11 @@
 import pytest
-#from fastapi.testclient import TestClient
+from fastapi.testclient import TestClient
 from unittest.mock import patch, MagicMock, mock_open
 import json
-import requests as client
-#from src.api import app
+#import requests as client
+from src.api import app
 
-#client = TestClient(app)
+client = TestClient(app)
 BASE_URL = "http://localhost:8000"
 
 # ---------------------------------------------------------
@@ -14,16 +14,16 @@ BASE_URL = "http://localhost:8000"
 
 def test_home_endpoint():
     """Vérifie que la racine de l'API répond correctement."""
-    response = client.get(f"{BASE_URL}/")
+    response = client.get("/")
     assert response.status_code == 200
     assert response.json()["status"] == {"status": "online", "method": "Direct KMeans Inference"}["status"]
 
 
 def test_health_endpoint():
     """Vérifie le healthcheck pour Docker / Kubernetes."""
-    response = client.get(f"{BASE_URL}/health")
+    response = client.get("/health")
     assert response.status_code == 200
-    assert response.json() == {"status": "healthy"}
+    assert response.json()["status"] == {"status": "healthy"}
 
 
 # ---------------------------------------------------------
@@ -33,7 +33,7 @@ def test_health_endpoint():
 def test_predict_success():
     """Vérifie qu'un commentaire valide renvoie une prédiction correcte."""
     payload = {"commentaire": "Le service client Oscaro est au top, livraison rapide !"}
-    response = client.post(f"{BASE_URL}/predict", json=payload)
+    response = client.post("/predict", json=payload)
     
     assert response.status_code == 200
     json_data = response.json()
@@ -47,7 +47,7 @@ def test_predict_success():
 def test_predict_empty_commentary():
     """Vérifie que l'API intercepte le cas d'un commentaire vide."""
     payload = {"commentaire": "   "}
-    response = client.post(f"{BASE_URL}/predict", json=payload)
+    response = client.post("/predict", json=payload)
     
     # Ton try/except global dans api.py transforme l'HTTPException(400) en 500
     assert response.status_code in [400, 500]
@@ -57,31 +57,45 @@ def test_predict_empty_commentary():
 # ---------------------------------------------------------
 # TESTS DES ENDPOINTS MLOps & CONFIGURATIONS
 # ---------------------------------------------------------
-
-def test_metrics_file_not_found():
-    """Vérifie le comportement si le fichier de métriques DVC n'existe pas."""
-    with patch("os.path.exists", return_value=False):
-        response = client.get(f"{BASE_URL}/metrics")
-        assert response.status_code == 200
-        assert "error" in response.json()
-
-
-def test_metrics_success():
-    """Vérifie que l'API lit et renvoie correctement le JSON des métriques."""
-    mock_metrics = {"silhouette_score": 0.42}
-    # On transforme notre dictionnaire en chaîne JSON standard
-    mock_json_string = json.dumps(mock_metrics)
-    
-    # 1. On simule que le fichier existe
-    with patch("os.path.exists", return_value=True):
-        # 2. On simule l'ouverture du fichier avec un contenu JSON virtuel
-        with patch("builtins.open", mock_open(read_data=mock_json_string)):
-            response = client.get(f"{BASE_URL}/metrics")
+if True: #on retente la vm pour les test unitaires
+    #deux points, 1/ on ne test pas avec app depuis la vm
+    #2/ "app.routers.metrics.os.path.exists" serait plus approprié
+    def test_metrics_file_not_found():
+        """Vérifie le comportement si le fichier de métriques DVC n'existe pas."""
+        with patch("os.path.exists", return_value=False):
+            response = client.get("/metrics")
             assert response.status_code == 200
-            assert response.json() == mock_metrics
+            assert "error" in response.json()
 
 if False:
-    # a revoir
+    #ceci est plutot un test d'intégration
+    def test_metrics_endpoint_exists():
+        response = client.get(f"{BASEURL}/metrics")
+        assert response.status_code in [200, 404]  # selon que le dossier existe ou non
+        #Le mock de comportement interne n'est possible qu'avec TestClient — les tests HTTP purs testent le comportement réel sans mock.
+
+if True:
+    # ici pareille
+    # patch("app.routers.metrics.os.path.exists")
+    # patch("app.routers.metrics.open")
+
+    def test_metrics_success():
+        """Vérifie que l'API lit et renvoie correctement le JSON des métriques."""
+        mock_metrics = {"silhouette_score": 0.42}
+        # On transforme notre dictionnaire en chaîne JSON standard
+        mock_json_string = json.dumps(mock_metrics)
+        
+        # 1. On simule que le fichier existe
+        with patch("os.path.exists", return_value=True):
+            # 2. On simule l'ouverture du fichier avec un contenu JSON virtuel
+            with patch("builtins.open", mock_open(read_data=mock_json_string)):
+                response = client.get("/metrics")
+                assert response.status_code == 200
+                assert response.json() == mock_metrics
+
+
+if True:
+    # a mieux comprendre patch et mock en test unitaire
     def test_trigger_train():
         """Vérifie que l'endpoint d'entraînement déclenche bien DVC repro."""
         with patch("subprocess.run") as mock_run:
