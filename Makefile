@@ -77,6 +77,12 @@ airflow_reset:
 airflow_ps:  ## list process runnings $(DOCKER_COMPOSE) -f airflow/docker-compose.yaml ps
 	$(DOCKER_COMPOSE) -f dockers/airflow/docker-compose.yaml ps
 
+airflow_diag:  ## list process runnings with -a
+	$(DOCKER_COMPOSE) -f dockers/airflow/docker-compose.yaml ps -a
+
+airflow_log:  ## view logs optional with -f
+	$(DOCKER_COMPOSE) -f dockers/airflow/docker-compose.yaml logs airflow-webserver
+
 # ── dvc ────────────────────────────────────────────────────
 # La règle à afficher dans le README ou le Makefile
 # UN fichier ne peut être tracké QUE par l'un des deux :
