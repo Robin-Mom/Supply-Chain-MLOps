@@ -81,7 +81,7 @@ def test_metrics_success():
             assert response.json() == mock_metrics
 
 if False:
-    /*a revoir*/
+    # a revoir
     def test_trigger_train():
         """Vérifie que l'endpoint d'entraînement déclenche bien DVC repro."""
         with patch("subprocess.run") as mock_run:
