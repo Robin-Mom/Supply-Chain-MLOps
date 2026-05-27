@@ -58,12 +58,14 @@ jobs:
         env:
           DAGSHUB_USER_TOKEN: ${{ secrets.DAGSHUB_CLIENT_TOKEN }}
 
-      - name: Check API logs
+      - name: Wait for API
         run: |
-          docker ps
-          docker system df
-          docker compose logs api
-
+          until curl -sf http://localhost:8000/health; do
+            sleep 3
+            docker ps
+            docker system df
+            docker compose logs api
+          done
 
       - name: open trainer and check dvc status avec synchro docker
         run: |
