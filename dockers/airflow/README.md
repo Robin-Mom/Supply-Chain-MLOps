@@ -242,3 +242,118 @@ docker compose version
 # après on peut repasser en docker compose -f dockers/airflow/docker-compose.yaml up airflow-init
 
 ```
+--------------------------------------------
+
+# traitement firewall
+```bash
+server nginx ip-172-31-37-17    172.31.37.17
+server airflow ip-172-31-44-5   172.31.44.5
+```
+
+```	1/ methode par firewall -> assez invasive
+	# Autoriser uniquement la machine Nginx 
+	sudo ufw allow from <ip-machine-nginx> to any port 8080 
+	
+	
+	#permettre le port 8080 pour juste la machine nginx
+	# Bloquer tout le reste sur ce port 
+	sudo ufw allow from 172.31.37.17 to any port 8080 
+	sudo ufw deny 8080
+
+	# Restauration en fin de mission
+	# Supprimer les règles ajoutées
+```
+```bash
+    sudo ufw delete allow from 172.31.37.17 to any port 8080
+    sudo ufw delete deny 8080
+```
+```	Vérifie que les règles sont bien supprimées :
+	bash
+	sudo ufw status numbered
+	
+	mais showstoper 🛑🛑🛑:
+	# Autoriser SSH avant tout — sinon tu te coupes l'accès ! 
+	sudo ufw allow ssh 
+	
+	# Puis activer 
+	sudo ufw enable 
+	
+	# Puis ajouter les règles Airflow 
+	sudo ufw allow from <ip-machine-nginx> to any port 8080 sudo ufw deny 8080
+
+	2/ methode par tunning de docker-compose -> respectueux de l'environnement
+```
+
+
+
+BON LE FIREWALL N'EST PAS ACTIF ET CA VAUX MIEUX cette méthode est assez invasive
+
+on passe par l'option 2 la config du docker-compose de airflow qui est à tunner de la manière suivante
+```	
+pour l'instant, accés http://lioravm15gi:8080/
+objectif accés unique http://lioravm77gi/airflow 
+```	
+
+```	
+Topologie réseau
+Internet
+  └──► Nginx (machine A 172.31.37.17)
+         └──► Airflow http://172.31.44.5:8080  ( ip-machine-airflow réseau interne uniquement)
+                └──► container Airflow (machine B)
+
+Le pare-feu sur la machine Airflow garantit que seul Nginx peut atteindre le port 8080.
+```	
+
+## procédure:
+
+### Configuraton nginx spécifique
+```
+# section upstream
+upstream airflow {server 172.31.44.5:8080;}
+
+server {
+    listen 443 ssl;
+    ...
+    location /airflow-proxy/ {
+        proxy_pass http://airflow;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+        proxy_set_header X-Forwarded-Host $host;
+        proxy_redirect off;
+    }
+
+
+```
+
+### Configuraton airflow spécifique
+```
+📇 .env
+# AIRFLOW__WEBSERVER__BASE_URL=https://mondomaine.com/airflow-proxy
+AIRFLOW__WEBSERVER__BASE_URL=https://LIORA-VM-77GI/airflow-proxy
+AIRFLOW__WEBSERVER__ENABLE_PROXY_FIX=True
+
+📇 docker-compose.yaml Airflow
+services:
+  airflow-webserver:
+   ...
+   ports:
+      #- "8080:8080"                  # ← écoute sur toutes les interfaces
+      - "172.31.37.17:8080:8080"      # écoute selective de ce qui vient d'nginx seulement
+    
+    healthcheck:
+    ...
+```
+
+
+Hint:
+```
+> Trouver l'IP interne de la machine Airflow
+> hostname -I
+> ou
+> ip addr show | grep inet
+```
+
+
+
