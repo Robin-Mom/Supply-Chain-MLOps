@@ -8,8 +8,8 @@ on:
 env:
   BACKEND: cpu                  #cpu ou gpu
   DOCKFLD: dockers/slim/        #${DOCKFLD}
-  COMPOSE_PROJECT_NAME: pr100 
-  API_VERSION: 1.0
+  COMPOSE_PROJECT_NAME: pr142 
+  API_VERSION: 0.0
   DAGSHUB_USER_TOKEN: ${{ secrets.DAGSHUB_CLIENT_TOKEN }}
 
 jobs:
@@ -26,23 +26,18 @@ jobs:
         uses: actions/cache@v4
         with:
           path: /tmp/.buildx-cache-142
-          key: ${{ runner.os }}-docker-${{ hashFiles('dockers/slim/Dockerfile') }}
+          key: ${{ runner.os }}-docker-${{ hashFiles('${DOCKFLD}/Dockerfile') }}
           restore-keys: |
             ${{ runner.os }}-docker-
       
       # Un seul build — les deux services l'utilisent
       - name: Build img142
         uses: docker/build-push-action@v5
-        with:
-          context: .
-          file: dockers/slim/Dockerfile
-          push: false
-          load: true
-          tags: img142:0.0
-          cache-from: type=local,src=/tmp/.buildx-cache-142
-          cache-to: type=local,dest=/tmp/.buildx-cache-142,mode=max
-        run: docker compose -f ${DOCKFLD}/docker-compose.yaml build common
-
+        run: | 
+          docker compose -f ${DOCKFLD}/docker-compose.yaml build common
+        env:
+          DOCKER_BUILDKIT: 1
+          BUILDKIT_INLINE_CACHE: 1
 
   test:
     needs: build
