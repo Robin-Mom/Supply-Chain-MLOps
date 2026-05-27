@@ -45,14 +45,14 @@ airflow_init: ## Initialiser airflow - ⚠️ airflow_init(evaluated)
 	$(DOCKER_COMPOSE) -f dockers/airflow/docker-compose.yaml up airflow-init
 
 #other triplet suggestion
-airflow-build:  ## airflow build
-	$(DOCKER_COMPOSE)  -f dockers/airflow/docker-compose.yaml build
+#airflow-build:  ## airflow build
+#	$(DOCKER_COMPOSE)  -f dockers/airflow/docker-compose.yaml build
 
-airflow-init-1:  ## runing initialisation ⚠️ airflow-init(non evaluated) <> airflow_init(evaluated)
-	$(DOCKER_COMPOSE)  -f dockers/airflow/docker-compose.yaml run --rm airflow-webserver airflow db migrate
+#airflow-init-1:  ## runing initialisation ⚠️ airflow-init(non evaluated) <> airflow_init(evaluated)
+#	$(DOCKER_COMPOSE)  -f dockers/airflow/docker-compose.yaml run --rm airflow-webserver airflow db migrate
 
-airflow-up: ## allumage de airflow
-	$(DOCKER_COMPOSE)  -f dockers/airflow/docker-compose.yaml up -d
+#airflow-up: ## allumage de airflow
+#	$(DOCKER_COMPOSE)  -f dockers/airflow/docker-compose.yaml up -d
 
 
 #La commande ci-dessus est à exécuter à chaque redémarrage de votre machine virtuelle sinon l'erreur suivante sera levée 
