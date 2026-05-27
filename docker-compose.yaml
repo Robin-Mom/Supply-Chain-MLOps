@@ -4,6 +4,14 @@ services:
     build:
       context: .
       dockerfile: docker/api.Dockerfile  # On peut avoir un Dockerfile spécifique pour l'API
+
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+      start_period: 30s    # ← laisse le temps au lifespan de charger le modèle
+
     ports:
       - "8000:8000"
     volumes:
@@ -23,6 +31,9 @@ services:
       - .:/app
     env_file:
       - .env
+    depends_on:
+      api:
+        condition: service_healthy         
     # Ce container s'éteint tout seul une fois l'entraînement fini
     command: ["dvc", "repro", "--force"]
 
