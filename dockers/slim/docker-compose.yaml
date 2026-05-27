@@ -9,6 +9,8 @@ services:
         DOCKFLD: ${DOCKFLD}
         #DAGSHUB_TOKEN: ${DAGSHUB_TOKEN}
     image: ${COMPOSE_PROJECT_NAME:-mlopsv}-app:${API_VERSION:-1.0.0}           # ← nomme et tag l'image buildée, COMPOSE_PROJECT_NAME vient de -p
+    profiles:
+      - building        # ← exclu du up classique
     command: echo "build only"   # ← ne fait rien, juste pour le build
   
   api:
