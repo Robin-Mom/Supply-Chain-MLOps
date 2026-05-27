@@ -34,11 +34,13 @@ jobs:
       - name: Build img142
         run: | 
           docker compose -f ${DOCKFLD}/docker-compose.yaml build common
+
+          make slimbuild-cpu
         env:
           DOCKER_BUILDKIT: 1
           BUILDKIT_INLINE_CACHE: 1
 
-  test:
+  pulldata:
     needs: builder
     runs-on: ubuntu-latest
     steps:
@@ -52,9 +54,17 @@ jobs:
           dvc remote modify origin --local password ${{ secrets.DAGSHUB_CLIENT_TOKEN }}
           dvc pull -r origin
 
+  testapicompose:
+    needs: pulldata
+    runs-on: ubuntu-latest
+    steps:
       - name: Start API
         run: 
           docker compose -p $(PROJECT) -f ${DOCKFLD}/docker-compose.yaml up -d api 
-
+  
+  unitestapi:
+    needs: pulldata
+    runs-on: ubuntu-latest
+    steps:
       - name: Run tests
         run: docker compose -p $(PROJECT) -f ${DOCKFLD}/docker-compose.yaml run --rm trainer pytest tests/
