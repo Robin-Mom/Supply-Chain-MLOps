@@ -8,9 +8,9 @@ services:
     healthcheck:
       #test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
       test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/health')"]
-      interval: 5s
+      interval: 10s
       timeout: 3s
-      retries: 10
+      retries: 30
       start_period: 30s    # ← laisse le temps au lifespan de charger le modèle
 
     ports:
