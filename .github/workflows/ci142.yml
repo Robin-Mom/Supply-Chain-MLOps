@@ -32,7 +32,6 @@ jobs:
       
       # Un seul build — les deux services l'utilisent
       - name: Build img142
-        uses: docker/build-push-action@v5
         run: | 
           docker compose -f ${DOCKFLD}/docker-compose.yaml build common
         env:
