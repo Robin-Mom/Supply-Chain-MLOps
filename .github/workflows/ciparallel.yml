@@ -1,0 +1,69 @@
+name: Supply CI parallel
+
+on:
+  workflow_dispatch:    # ← tu contrôles manuellement
+  push:
+    branches: [ feat/nginx_2 ]   # ← ou sur ta branche de dev
+
+jobs:
+  build-api:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Cache API layers
+        uses: actions/cache@v4
+        with:
+          path: /tmp/.buildx-cache-api
+          key: ${{ runner.os }}-docker-api-${{ hashFiles('Dockerfile.api') }}
+          restore-keys: |
+            ${{ runner.os }}-docker-api-
+
+      - name: Build API
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          file: Dockerfile.api
+          push: false
+          load: true
+          tags: api:latest
+          cache-from: type=local,src=/tmp/.buildx-cache-api
+          cache-to: type=local,dest=/tmp/.buildx-cache-api,mode=max
+
+  build-trainer:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Cache Trainer layers
+        uses: actions/cache@v4
+        with:
+          path: /tmp/.buildx-cache-trainer
+          key: ${{ runner.os }}-docker-trainer-${{ hashFiles('Dockerfile.trainer') }}
+          restore-keys: |
+            ${{ runner.os }}-docker-trainer-
+
+      - name: Build Trainer
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          file: Dockerfile.trainer
+          push: false
+          load: true
+          tags: trainer:latest
+          cache-from: type=local,src=/tmp/.buildx-cache-trainer
+          cache-to: type=local,dest=/tmp/.buildx-cache-trainer,mode=max
+
+  test:
+    runs-on: ubuntu-latest
+    needs: [build-api, build-trainer]   # ← attend les deux builds
+    steps:
+      - uses: actions/checkout@v4
+      - name: Run tests
+        run: docker compose run --rm trainer pytest tests/
