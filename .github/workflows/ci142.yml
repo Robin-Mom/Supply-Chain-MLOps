@@ -38,6 +38,7 @@ jobs:
           cache-to: type=local,dest=/tmp/.buildx-cache-142,mode=max
         run: |
           docker compose -f ${DOCKFLD}/docker-compose.yaml build common
+  
           
   test:
     needs: build
