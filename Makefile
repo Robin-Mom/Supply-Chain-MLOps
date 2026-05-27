@@ -137,23 +137,26 @@ down: ## ferme tout les dockers
 
 # ── slimBuild ─────────────────────────────────────────────────
 # construction avec le dockerfile spécifié et la target
-slmbuild: ## Build l'image trainer (BACKEND=cpu|gpu)  #--no-cache --progress=plain 
+slmbuild0: ## Build l'image trainer (BACKEND=cpu|gpu)  #--no-cache --progress=plain 
 	docker build \
 	--build-arg BACKEND=$(BACKEND) \
 	--build-arg DOCKFLD=$(DOCKFLD) \
 	-f $(DOCKFLD)$(DOCK) -t $(TAG) .
 
-slmbuild-cpu: ## Build CPU explicitement
-	$(MAKE) slmbuild BACKEND=cpu DOCKFLD=dockers/slim/
+slimbuild: ## Build l'image trainer (BACKEND=cpu|gpu)  #--no-cache --progress=plain 
+	docker compose -f $(DOCKFLD)docker-compose.yaml --profile building build common 
+	
+slimbuild-cpu: ## Build CPU explicitement
+	$(MAKE) slimbuild BACKEND=cpu DOCKFLD=dockers/slim/
 
-slmbuild-gpu: ## Build GPU (CUDA 12.4) explicitement
-	$(MAKE) slmbuild BACKEND=gpu DOCKFLD=dockers/slim/
+slimbuild-gpu: ## Build GPU (CUDA 12.4) explicitement
+	$(MAKE) slimbuild BACKEND=gpu DOCKFLD=dockers/slim/
 
 #  pour appeler une target Make depuis une autre target, 
 #  c'est toujours $(MAKE) <target> VAR=valeur
 #  et TAG est une fonction f(IMAGE,BACKEND)
-slmbuild-test: ## Build image de test CPU :: make slimbuild-test
-	$(MAKE) slmbuild-cpu IMAGE=supply-test
+slimbuild-test: ## Build image de test CPU :: make slimbuild-test
+	$(MAKE) slimbuild-cpu IMAGE=supply-test
 
 slmtestconfig: ## Testing the docker compose config
 	docker compose -f docker-compose1.yaml config |less #| grep -A 10 "args"
