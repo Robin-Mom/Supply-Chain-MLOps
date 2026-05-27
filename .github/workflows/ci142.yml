@@ -39,7 +39,7 @@ jobs:
           BUILDKIT_INLINE_CACHE: 1
 
   test:
-    needs: build
+    needs: builder
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
