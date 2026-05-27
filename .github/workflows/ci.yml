@@ -45,7 +45,8 @@ jobs:
           echo "MLFLOW_TRACKING_URI=https://dagshub.com/schmilblick-ai/Supply-Chain-MLOps.mlflow" >> .env
           echo "MLFLOW_TRACKING_USERNAME=marv1-ops" >> .env
           echo "MLFLOW_TRACKING_PASSWORD=${{ secrets.MLFLOW_TRACKING_PASSWORD }}" >> .env
-          echo "DAGSHUB_CLIENT_TOKEN=${{ secrets.DAGSHUB_CLIENT_TOKEN }}" >> .env
+          echo "export DAGSHUB_CLIENT_TOKEN=${{ secrets.DAGSHUB_CLIENT_TOKEN }}" >> .env
+          echo "export DAGSHUB_USER_TOKEN=${{ secrets.DAGSHUB_CLIENT_TOKEN }}" >> .env
 
       - name: Create dummy external network for Airflow
         run: docker network create airflow_default || true
