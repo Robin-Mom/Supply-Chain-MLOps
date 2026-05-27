@@ -17,8 +17,8 @@ jobs:
       - name: Free Disk Space (Ubuntu Runner)
         run: |
           whoami
-          id ubuntu && true
-          id root
+          id runner && true
+          which curl
           sudo rm -rf /usr/share/dotnet
           sudo rm -rf /usr/local/lib/android
           sudo rm -rf /opt/ghc
@@ -53,6 +53,8 @@ jobs:
       - name: Build et start API Docker image
         run: |
           docker compose up -d api
+        env:
+          DAGSHUB_USER_TOKEN: ${{ secrets.DAGSHUB_CLIENT_TOKEN }}
 
       - name: open trainer and check dvc status avec synchro docker
         run: |
@@ -63,7 +65,12 @@ jobs:
               dvc pull -r origin
               dvc status -r origin
             "
-      
+      - name: Wait for API
+        run: |
+          until curl -sf http://localhost:8000/health; do
+            sleep 3
+          done
+
       - name: Run unit tests depuis la vm - Après la synchro - api dispo
         run: |
           pip install pytest requests
