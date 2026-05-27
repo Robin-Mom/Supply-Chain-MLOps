@@ -1,0 +1,61 @@
+name: Supply CI 1 image for 2 container
+
+on:
+  workflow_dispatch:    # ← tu contrôles manuellement
+  push:
+    branches: [ feat/nginx_2 ]   # ← ou sur ta branche de dev
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Cache layers
+        uses: actions/cache@v4
+        with:
+          path: /tmp/.buildx-cache-142
+          key: ${{ runner.os }}-docker-${{ hashFiles('dockers/slim/Dockerfile') }}
+          restore-keys: |
+            ${{ runner.os }}-docker-
+
+      # Un seul build — les deux services l'utilisent
+      - name: Build img142
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          file: dockers/slim/Dockerfile
+          push: false
+          load: true
+          tags: img142:0.0
+          cache-from: type=local,src=/tmp/.buildx-cache-142
+          cache-to: type=local,dest=/tmp/.buildx-cache-142,mode=max
+
+  test:
+    needs: build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Pull data
+        run: |
+          pip install dvc[http]
+          dvc remote add -d --force origin https://dagshub.com/schmilblick-ai/Supply-Chain-MLOps.dvc
+          dvc remote modify origin --local auth basic
+          dvc remote modify origin --local user marv1-ops
+          dvc remote modify origin --local password ${{ secrets.DAGSHUB_CLIENT_TOKEN }}
+          dvc pull -r origin
+
+      - name: Start API
+        run: docker compose up -d api
+        env:
+          DAGSHUB_USER_TOKEN: ${{ secrets.DAGSHUB_CLIENT_TOKEN }}
+
+      - name: Run tests
+        run: |
+          docker compose run --rm \
+            -e DAGSHUB_USER_TOKEN="${{ secrets.DAGSHUB_CLIENT_TOKEN }}" \
+            trainer pytest tests/
