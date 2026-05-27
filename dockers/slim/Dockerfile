@@ -30,9 +30,9 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 WORKDIR /build
 
 # On copie uniquement les fichiers de dépendances
-
-COPY ./requirements-base.txt .
-COPY ./requirements-${BACKEND}.txt .
+# attention on remote de ../.. donc il faut chercher dans $DOCKFLD
+COPY ${DOCKFLD}requirements-base.txt .
+COPY ${DOCKFLD}requirements-${BACKEND}.txt .
 
 # Installation dans un prefix isolé → facile à copier au stage suivant
 RUN pip install --no-cache-dir --prefix=/install -r requirements-${BACKEND}.txt
