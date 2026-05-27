@@ -54,8 +54,16 @@ jobs:
       - name: Build et start API Docker image
         run: |
           docker compose up -d api
+          docker ps
         env:
           DAGSHUB_USER_TOKEN: ${{ secrets.DAGSHUB_CLIENT_TOKEN }}
+
+      - name: Check API logs
+        run: |
+          docker ps
+          docker system df
+          docker compose logs api
+
 
       - name: open trainer and check dvc status avec synchro docker
         run: |
