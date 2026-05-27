@@ -36,19 +36,23 @@ secrets:  ## 👍 Generate CA.crt and nginx.crt in the dockers/nginx/certs area 
 	./dockers/nginx/certs/secretgen.sh localhost LIORA-VM-77Gi 108.130.252.7 ./dockers/nginx/certs
 
 # ── Airflow ────────────────────────────────────────────────────
+# AIRFLOW pull ? to be confirmed
+airflow_pull:  ## To be validated on the prereqs for airflow
+	docker compose -f dockers/airflow/docker-compose.yaml pull
+
 # AIRFLOW INIT SECTION TO ALWAYS RUN FIRST TIME DEPLOYED ON A NEW DEVICE
 airflow_init: ## Initialiser airflow
 	$(DOCKER_COMPOSE) -f dockers/airflow/docker-compose.yaml up airflow-init
 
 #other triplet suggestion
-airflow-build:
-    docker compose -f dockers/airflow/docker-compose.yaml build
+airflow-build:  ## airflow build
+	$(DOCKER_COMPOSE)  -f dockers/airflow/docker-compose.yaml build
 
-airflow-init-1:
-    docker compose -f dockers/airflow/docker-compose.yaml run --rm airflow-webserver airflow db migrate
+airflow-init-1:  ## runing
+	$(DOCKER_COMPOSE)  -f dockers/airflow/docker-compose.yaml run --rm airflow-webserver airflow db migrate
 
-airflow-up:
-    docker compose -f dockers/airflow/docker-compose.yaml up -d
+airflow-up: ## allumage de airflow
+	$(DOCKER_COMPOSE)  -f dockers/airflow/docker-compose.yaml up -d
 
 
 #La commande ci-dessus est à exécuter à chaque redémarrage de votre machine virtuelle sinon l'erreur suivante sera levée 
