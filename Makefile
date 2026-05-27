@@ -40,6 +40,17 @@ secrets:  ## 👍 Generate CA.crt and nginx.crt in the dockers/nginx/certs area 
 airflow_init: ## Initialiser airflow
 	$(DOCKER_COMPOSE) -f dockers/airflow/docker-compose.yaml up airflow-init
 
+#other triplet suggestion
+airflow-build:
+    docker compose -f dockers/airflow/docker-compose.yaml build
+
+airflow-init-1:
+    docker compose -f dockers/airflow/docker-compose.yaml run --rm airflow-webserver airflow db migrate
+
+airflow-up:
+    docker compose -f dockers/airflow/docker-compose.yaml up -d
+
+
 #La commande ci-dessus est à exécuter à chaque redémarrage de votre machine virtuelle sinon l'erreur suivante sera levée 
 # : docker.errors.DockerException: Error while fetching server API version: ('Connection aborted.', PermissionError(13, 'Permission denied'))
 # prereq juste pour utiliser le DockerOperator
