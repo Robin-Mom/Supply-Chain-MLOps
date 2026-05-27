@@ -30,11 +30,20 @@ jobs:
           restore-keys: |
             ${{ runner.os }}-docker-
       
+      - name: Create .env file for Docker Compose
+        run: |
+          echo "MLFLOW_TRACKING_URI=https://dagshub.com/schmilblick-ai/Supply-Chain-MLOps.mlflow" > .env
+          echo "MLFLOW_TRACKING_USERNAME=marv1-ops" >> .env
+          echo "MLFLOW_TRACKING_PASSWORD=${{ secrets.MLFLOW_TRACKING_PASSWORD }}" >> .env
+          echo "export DAGSHUB_CLIENT_TOKEN=${{ secrets.DAGSHUB_CLIENT_TOKEN }}" >> .env
+          echo "export DAGSHUB_USER_TOKEN=${{ secrets.DAGSHUB_CLIENT_TOKEN }}" >> .env
+          echo -e "COMPOSE_PROJECT_NAME=pr007\n API_VERSION=1.0.0\n BACKEND=cpu\n DOCKFLD=dockers/slim/" >> .env
+
+
       # Un seul build — les deux services l'utilisent
       - name: Build img142
         run: | 
-          docker compose -f ${DOCKFLD}/docker-compose.yaml build common
-
+          #docker compose -f ${DOCKFLD}/docker-compose.yaml build common
           make slimbuild-cpu
         env:
           DOCKER_BUILDKIT: 1
