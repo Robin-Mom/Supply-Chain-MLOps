@@ -2,8 +2,8 @@ services:
   # Service 1 : L'API (Inférence) Oscaro Trust Pilot
   common:
     build:
-      context: .
-      dockerfile: Dockerfile
+      context: ../..
+      dockerfile: ${DOCKFLD}Dockerfile
       args:
         BACKEND: ${BACKEND:-cpu}
         DOCKFLD: ${DOCKFLD}
@@ -23,14 +23,14 @@ services:
     env_file:
       - ../../.env
     #networks:
-    #  - airflow_default  # ✅ référence uniquement
+    #  - airflow_default  # ✅ référence uniquement DEBUNK uvicorn src.api:app --host 0.0.0.0 --port 8000 --reload
     command: ["uvicorn", "src.api:app", "--host", "0.0.0.0", "--port", "8000", "--reload"]
     healthcheck:
       test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/health')"]
       interval: 5s      # vérifie toutes les 5s
       timeout: 3s
-      retries: 5        # considère healthy après 5 succès
-      start_period: 30s # laisse 30s à l'API pour démarrer
+      retries: 10        # considère healthy après 5 succès
+      start_period: 60s # laisse 30s à l'API pour démarrer
 
   # Service 2 : Le Trainer (Cycle de vie ML)
   trainer:

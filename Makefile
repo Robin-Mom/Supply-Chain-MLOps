@@ -10,7 +10,7 @@ DOCKFLD   := dockers/slim/
 DOCK      := Dockerfile
 # a project variable that will server to prefix the images and containers and identify the ressources for cleaning
 # mainly used in -p option of docker compose -d or idn docker-compose
-PROJECT   := pr001
+PROJECT   := pr007
 
 #definition du docker_compose disponible
 DOCKER_COMPOSE := $(shell which docker-compose 2>/dev/null || echo "docker compose")
@@ -26,12 +26,12 @@ export AIRFLOW_GID := 0
 .PHONY: help secrets airflow_init airflow_prepdocker_sock airflow_up airflow_force_recreate airflow_down airflow_reset airflow_ps dvc-repro dvc-push up down slmbuild slmbuild-cpu slmbuild-gpu slmbuild-test start-api start-airflow start-ip-conditional clean cleanDandling
 
 # ── Help ──────────────────────────────────────────────────────
-help: ## this help
+help: ## 👍 this help
 	@grep -E '^[a-zA-Z_-]+:.*?## .*$$' $(MAKEFILE_LIST) \
 		| awk 'BEGIN {FS = ":.*?## "}; {printf "  \033[36m%-20s\033[0m %s\n", $$1, $$2}'
 
 # ── Build dev Certificate Authority and Certificates for 443 ──
-secrets:
+secrets:  ## 👍 Generate CA.crt and nginx.crt in the dockers/nginx/certs area for dev
 	#note j'ai mis une IP variable 108.130.252.7 mais on en a pas besoin - juste pour que le dossier certs soit en 4ème param
 	./dockers/nginx/certs/secretgen.sh localhost LIORA-VM-77Gi 108.130.252.7 ./dockers/nginx/certs
 
@@ -172,7 +172,7 @@ start-project:
 log-project:
 	$(DOCKER_COMPOSE) -p $(PROJECT) -f docker-compose1.yaml logs
 	
-stop-project:
+stop-project: ## 👍 Stop current running containers for the project $(PROJECT)
 	$(DOCKER_COMPOSE) -p $(PROJECT) -f docker-compose1.yaml down -v
 
 diag-project:
@@ -182,7 +182,7 @@ diag-project:
 # Détecte la machine automatiquement - I car on travaillera en IP pas en dns pour la config nginx
 CURRENT_IP := $(shell hostname -I | awk '{print $$1}')
 
-start-api:  ## starting grafana < prometheus < api < nginx
+start-api:  ## 👍 starting grafana < prometheus < api < nginx
 	@echo "Lancement API sur $(CURRENT_IP)"
 	docker network create airflow_default 2>/dev/null || true
 	$(DOCKER_COMPOSE) -p $(PROJECT) -f docker-compose1.yaml up -d --build
@@ -192,14 +192,14 @@ start-airflow: ## airflow start separation to consider on localhost mono approad
 	@echo "Lancement Airflow sur $(CURRENT_IP)"
 	$(DOCKER_COMPOSE) -p $(PROJECT) -f docker-compose1.yaml up -d
 
-start-ip-conditional: ## 👍 main starter that separate for starting on different hosts
+start-ip-conditional: ## main starter that separate for starting on different hosts
 	@if [ "$(CURRENT_IP)" = "${API_HOST}" ]; then \
 		make start-api; \
 	elif [ "$(CURRENT_IP)" = "${AIRFLOW_HOST}" ]; then \
 		make start-airflow; \
 	fi
 
-clean: ## Disk Space Recycling
+clean: ## 👍 Disk Space Recycling
 	@ echo "=== Initial State ==="
 	@ docker system df
 	# Supprimer les dangling images
@@ -221,8 +221,8 @@ nginxConfReload: ## reload a chaud pour tester un changement de config nginx
 	docker exec nginx_revproxy nginx -s reload
 
 nginxLogs: ## view the logs
-	docker compose -p pr001 -f docker-compose1.yaml logs -f
+	docker compose -p $(PROJECT) -f docker-compose1.yaml logs -f
 
 updateFreeze: ## Update the slim requirement-freeze.txt, make it used in the resolution if it exists
 	# once docker is up we can capture the pip resolution and reapply
-	docker exec pr001-api-1 pip freeze > dockers/slim/requirements-freeze.txt
+	docker exec $(PROJECT)-api-1 pip freeze > dockers/slim/requirements-freeze.txt
