@@ -41,14 +41,14 @@ airflow_pull:  ## To be validated on the prereqs for airflow
 	docker compose -f dockers/airflow/docker-compose.yaml pull
 
 # AIRFLOW INIT SECTION TO ALWAYS RUN FIRST TIME DEPLOYED ON A NEW DEVICE
-airflow_init: ## Initialiser airflow
+airflow_init: ## Initialiser airflow - ⚠️ airflow_init(evaluated)
 	$(DOCKER_COMPOSE) -f dockers/airflow/docker-compose.yaml up airflow-init
 
 #other triplet suggestion
 airflow-build:  ## airflow build
 	$(DOCKER_COMPOSE)  -f dockers/airflow/docker-compose.yaml build
 
-airflow-init-1:  ## runing
+airflow-init-1:  ## runing initialisation ⚠️ airflow-init(non evaluated) <> airflow_init(evaluated)
 	$(DOCKER_COMPOSE)  -f dockers/airflow/docker-compose.yaml run --rm airflow-webserver airflow db migrate
 
 airflow-up: ## allumage de airflow

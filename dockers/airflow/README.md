@@ -186,3 +186,59 @@ Fichier|Rôle
 `dvc.yaml`|Définit les stages et leurs outputs
 `dvc.lock`|Snapshot des hash des outputs actuels
 `.dvc/cache`|/Stockage local des artefacts à pousser
+
+
+
+## sur un autre host si une mise à jour de docker compose est requise
+ un host en docker-compose v1.28, le script d'initialisation de airflow ne sera pas compatible
+ il faut passer à la version 2.1>
+
+ bien comparer les versions
+ ```bash
+ cat /etc/os-release
+```
+
+ si host récent
+```bash
+    sudo apt-get update
+    sudo apt-get install docker-compose-plugin
+```
+si host ancien il se peut que docker-compose en v1.29 soit installé en tant que binaire
+en faire un backup
+```bash
+sudo mv /usr/local/bin/docker-compose /usr/local/bin/docker-compose-v1.bak
+```
+
+puis retenter
+```bash
+sudo apt-get update
+sudo apt-get install docker-compose-plugin
+```
+
+si E: Unable to locate package docker-compose-plugin
+
+Sur Ubuntu 20.04, le plugin n'est pas dans les repos apt par défaut. Il faut ajouter le repo officiel Docker :
+```bash
+# Ajouter le repo Docker officiel
+sudo apt-get update
+sudo apt-get install ca-certificates curl gnupg
+
+sudo install -m 0755 -d /etc/apt/keyrings
+curl -fsSL https://download.docker.com/linux/ubuntu/gpg | sudo gpg --dearmor -o /etc/apt/keyrings/docker.gpg
+sudo chmod a+r /etc/apt/keyrings/docker.gpg
+
+echo \
+  "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/docker.gpg] https://download.docker.com/linux/ubuntu \
+  $(. /etc/os-release && echo "$VERSION_CODENAME") stable" | \
+  sudo tee /etc/apt/sources.list.d/docker.list > /dev/null
+
+# Mettre à jour et installer
+sudo apt-get update
+sudo apt-get install docker-compose-plugin
+
+# Vérifier
+docker compose version
+
+# après on peut repasser en docker compose -f dockers/airflow/docker-compose.yaml up airflow-init
+
+```
