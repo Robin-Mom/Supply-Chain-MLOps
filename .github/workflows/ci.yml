@@ -18,6 +18,7 @@ jobs:
         run: |
           whoami
           id ubuntu && true
+          id root
           sudo rm -rf /usr/share/dotnet
           sudo rm -rf /usr/local/lib/android
           sudo rm -rf /opt/ghc
@@ -27,27 +28,16 @@ jobs:
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
 
-      - name: Check environnement
+      - name: Check environnement et PULL DVC sur la vm - séparation des responsabilités
         if: true
         run: |
-          z="${{ secrets.DAGSHUB_CLIENT_TOKEN }}"
-          echo $(expr substr "$z" 1 1) echo $(expr substr "$z" 17 1) echo $(expr substr "$z" 28 1)
-          echo $(expr length "$z")
-
-          pwd
-          ls -arl
-          df -Ph
-          free -h
-          hostname
-          which git
-          echo $PATH
-          grep -a2 "last_run_id" dvc.lock|grep md5:
+          pwd ; ls -arl ; df -Ph ; free -h ; hostname ; which git
+          echo $PATH ; docker ps || true
           pip install dvc[http]
           dvc remote add -d --force origin https://dagshub.com/schmilblick-ai/Supply-Chain-MLOps.dvc
           dvc remote modify origin --local auth basic
           dvc remote modify origin --local user marv1-ops
-          DAGSHUB_USER_TOKEN=${{ secrets.DAGSHUB_CLIENT_TOKEN }}
-          dvc remote modify origin --local password $DAGSHUB_USER_TOKEN
+          dvc remote modify origin --local password ${{ secrets.DAGSHUB_CLIENT_TOKEN }}
           dvc pull -r origin
 
       - name: Create .env file for Docker Compose
@@ -60,50 +50,21 @@ jobs:
       - name: Create dummy external network for Airflow
         run: docker network create airflow_default || true
 
-      # 🔐 CONFIGURATION ET PULL DVC AMÉLIORÉE
-      # On injecte les secrets directement dans l'environnement du conteneur
-      - name: Pull Data and Models from DVC
-        if: false
+      - name: Build et start API Docker image
         run: |
-          docker compose run --rm -e DAGSHUB_TOKEN="${{ secrets.DAGSHUB_CLIENT_TOKEN }}" \
+          docker compose up -d api
+
+      - name: open trainer and check dvc status avec synchro docker
+        run: |
+          docker compose run --rm \
             trainer sh -c "
               cd /app
-              grep -a2 "last_run_id" dvc.lock|grep md5:
-              dvc remote add -d --force origin https://dagshub.com/schmilblick-ai/Supply-Chain-MLOps.dvc
-              dvc remote modify origin --local auth basic
-              dvc remote modify origin --local user marv1-ops
-              dvc remote modify origin --local password \$DAGSHUB_TOKEN
-              ls -arl .dvc
-              echo 'SARTING THE PULL'
-              dvc pull -r origin
-            "
-      - name: Pull Data and Models from DVC 2
-        run: |
-          docker compose run --rm -e DAGSHUB_TOKEN="${{ secrets.DAGSHUB_CLIENT_TOKEN }}" \
-            trainer sh -c "
-              echo 'EXPLORING ENV FOR THE PULL'
-              #dvc init --no-scm --force
-              echo \$HOME
-              whoami
-              ls -arl .dvc
-              cut -d= -f1 .dvc/config
-              cut -d= -f1 .dvc/config.local 2>/dev/null || true
-              pwd
-              cd /app
-              z=$DAGSHUB_TOKEN
-              echo $(expr substr "$z" 1 1) echo $(expr substr "$z" 17 1) echo $(expr substr "$z" 28 1)
-              echo $(expr length "$z")
-              echo 'dvc ATTEMPT'
-              dvc remote modify origin --local password $DAGSHUB_TOKEN
               ls -arl .dvc
               dvc pull -r origin
+              dvc status -r origin
             "
-
-      - name: Run unit tests via Docker
+      
+      - name: Run unit tests depuis la vm - Après la synchro - api dispo
         run: |
-          docker compose run --rm -e DAGSHUB_USER_TOKEN="${{ secrets.DAGSHUB_CLIENT_TOKEN }}" \
-            trainer pytest tests/
-
-      - name: Build API Docker image
-        run: |
-          docker compose build api
+          pip install pytest requests
+          pytest tests/
