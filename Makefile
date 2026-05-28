@@ -217,8 +217,10 @@ airf-stop: ## 👍 Stop current running containers for the project $(PROJECT)
 
 start-ip-conditional: ## main starter that separate for starting on different hosts
 	@if [ "$(CURRENT_IP)" = "${API_HOST}" ]; then \
+		echo "STARTING API SIDE AND NGINX"; \
 		make proj-start; \
 	elif [ "$(CURRENT_IP)" = "${AIRFLOW_HOST}" ]; then \
+		echo "STARTING AIRFLOW SIDE"; \
 		make airf-start; \
 	fi
 
