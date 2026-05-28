@@ -72,6 +72,8 @@ services:
   grafana:
     image: grafana/grafana:latest
     container_name: grafana_dashboard
+    env_file:
+      - ../../.env  
     ports:
       - "3000:3000"
     volumes:
@@ -81,8 +83,9 @@ services:
     environment:
       - GF_SECURITY_ADMIN_USER=admin
       - GF_SECURITY_ADMIN_PASSWORD=admin
-      - GF_SERVER_ROOT_URL=https://%(domain)s/grafana/   # ✅
-      - GF_SERVER_SERVE_FROM_SUB_PATH=true               # ✅
+      #- GF_SERVER_ROOT_URL=https://%(domain)s/grafana/   # ✅💀
+      #- GF_SERVER_ROOT_URL=https://${AIRFLOW_HOST:-localhost}/grafana/ 
+      #- GF_SERVER_SERVE_FROM_SUB_PATH=true               # ✅💀
       # ROOT_URL            →  URLs absolues correctes       ✅
       # SERVE_FROM_SUB_PATH →  assets relatifs au sous-chemin  ✅
       # Les deux ensemble   →  Grafana fonctionne derrière nginx ✅
