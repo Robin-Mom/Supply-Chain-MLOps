@@ -28,7 +28,7 @@ services:
       interval: 5s      # vérifie toutes les 5s
       timeout: 3s
       retries: 5        # considère healthy après 5 succès
-      start_period: 30s # laisse 30s à l'API pour démarrer
+      start_period: 90s # laisse 90s à l'API pour démarrer
 
   # Service 2 : Le Trainer (Cycle de vie ML)
   trainer:
