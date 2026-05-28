@@ -23,7 +23,7 @@ export AIRFLOW_GID := 0
 
 # ── Phony ─────────────────────────────────────────────────────
 #target not to take for files but command lines are liste in the .PHONY statement
-.PHONY: help secrets airflow_init airflow_prepdocker_sock airflow_up airflow_force_recreate airflow_down airflow_reset airflow_ps dvc-repro dvc-push up down slmbuild slmbuild-cpu slmbuild-gpu slmbuild-test start-api start-airflow start-ip-conditional clean cleanDandling
+.PHONY: help secrets airflow_init airflow_prepdocker_sock airflow_up airflow_force_recreate airflow_down airflow_reset airflow_ps dvc-repro dvc-push up down slmbuild slmbuild-cpu slmbuild-gpu slmbuild-test start-api start-airflow start-ip-conditional clean cleanDandling graf_ps graf_inspect graf_logs
 
 # ── Help ──────────────────────────────────────────────────────
 help: ## 👍 this help
@@ -190,34 +190,36 @@ start-project:
 	$(DOCKER_COMPOSE) -p $(PROJECT) -f docker-compose1.yaml up -d --build 
 	#--dry-run
 
-log-project:
+proj-log:
 	$(DOCKER_COMPOSE) -p $(PROJECT) -f docker-compose1.yaml logs
 	
-stop-project: ## 👍 Stop current running containers for the project $(PROJECT)
+proj-stop: ## 👍 Stop current running containers for the project $(PROJECT)
 	$(DOCKER_COMPOSE) -p $(PROJECT) -f docker-compose1.yaml down -v
 
-diag-project:
+proj-diag:
 	$(DOCKER_COMPOSE) -p $(PROJECT) -f docker-compose1.yaml config
 
 
 # Détecte la machine automatiquement - I car on travaillera en IP pas en dns pour la config nginx
 CURRENT_IP := $(shell hostname -I | awk '{print $$1}')
 
-start-api:  ## 👍 starting grafana < prometheus < api < nginx
+proj-start:  ## 👍 starting grafana < prometheus < api < nginx + airflow if not commented
 	@echo "Lancement API sur $(CURRENT_IP)"
 	docker network create airflow_default 2>/dev/null || true
 	$(DOCKER_COMPOSE) -p $(PROJECT) -f docker-compose1.yaml up -d --build
 
-
-start-airflow: ## airflow start separation to consider on localhost mono approad
+airf-start: ## airflow start separation to consider on localhost mono approad
 	@echo "Lancement Airflow sur $(CURRENT_IP)"
-	$(DOCKER_COMPOSE) -p $(PROJECT) -f docker-compose1.yaml up -d
+	$(DOCKER_COMPOSE) -p $(PROJECT) -f docker-compose2.yaml up -d
+
+airf-stop: ## 👍 Stop current running containers for the project $(PROJECT)
+	$(DOCKER_COMPOSE) -p $(PROJECT) -f docker-compose2.yaml down -v
 
 start-ip-conditional: ## main starter that separate for starting on different hosts
 	@if [ "$(CURRENT_IP)" = "${API_HOST}" ]; then \
-		make start-api; \
+		make proj-start; \
 	elif [ "$(CURRENT_IP)" = "${AIRFLOW_HOST}" ]; then \
-		make start-airflow; \
+		make airf-start; \
 	fi
 
 clean: ## 👍 Disk Space Recycling
@@ -244,6 +246,21 @@ nginxConfReload: ## reload a chaud pour tester un changement de config nginx
 nginxLogs: ## view the logs
 	docker compose -p $(PROJECT) -f docker-compose1.yaml logs -f
 
+ngxtest: ## test syntax of nginx cong before reloading
+	@ docker exec nginx_revproxy nginx -t  && echo " "	
+
+ngxreload: ## hot reload of nginx config
+	@ $(MAKE) ngxtest && docker exec nginx_revproxy nginx -s reload && echo " "	
+
 updateFreeze: ## Update the slim requirement-freeze.txt, make it used in the resolution if it exists
 	# once docker is up we can capture the pip resolution and reapply
 	docker exec $(PROJECT)-api-1 pip freeze > dockers/slim/requirements-freeze.txt
+
+graf_ps: ## Statut du container Grafana
+	docker compose ps grafana
+
+graf_inspect: ## Inspection détaillée de l'état Grafana
+	docker inspect grafana_dashboard | grep -A10 "State"
+
+graf_logs: ## Logs en direct de Grafana
+	docker compose logs -f grafana
