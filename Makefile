@@ -201,8 +201,30 @@ proj-diag:
 
 
 # Détecte la machine automatiquement - I car on travaillera en IP pas en dns pour la config nginx
-CURRENT_IP := $(shell hostname -I | awk '{print $$1}')
 
+# Détecte l'OS (Darwin = Mac, Linux = Linux)
+UNAME_S := $(shell uname -s)
+
+ifeq ($(UNAME_S),Darwin)
+	# Version Mac : récupère l'IP du Wi-Fi (en0)
+	CURRENT_IP := $(shell ipconfig getifaddr en0 || ipconfig getifaddr en1)
+else
+	# Version Linux/WSL : conserve ta logique d'origine
+	CURRENT_IP := $(shell hostname -I | awk '{print $$1}')
+endif
+
+# Sécurité : Si tu es en filaire (Ethernet) sur Mac, en0 peut être vide.
+# Si CURRENT_IP est vide, on met localhost par défaut pour éviter un crash.
+CURRENT_IP := $(or $(CURRENT_IP),127.0.0.1)
+
+# ─────────────────────────────────────────
+currip: ## Affiche l'IP courante détectée
+	@echo "OS         : $(UNAME_S)"
+	@echo "CURRENT_IP : $(CURRENT_IP)"
+
+testcu: ## Test avec l'IP courante
+	@echo "Lancement API sur $(CURRENT_IP)"
+	
 proj-start:  ## 👍 starting grafana < prometheus < api < nginx + airflow if not commented
 	@echo "Lancement API sur $(CURRENT_IP)"
 	docker network create airflow_default 2>/dev/null || true
