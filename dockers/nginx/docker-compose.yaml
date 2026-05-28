@@ -5,6 +5,8 @@ services:
       context: .
       dockerfile: Dockerfile
     container_name: nginx_revproxy
+    env_file:
+      - ../../.env          
     ports:
       - "8080:80"
       - "443:443"
@@ -31,6 +33,8 @@ services:
   nginx_exporter:
     image: nginx/nginx-prometheus-exporter:latest
     container_name: nginx_exporter
+    env_file:
+      - ../../.env          
     ports:
       - "9113:9113"
     depends_on:
@@ -42,6 +46,8 @@ services:
   prometheus:
     image: prom/prometheus:latest
     container_name: prometheus_server
+    env_file:
+      - ../../.env          
     expose:  # FIX000 pas de ports
       - "9090"
     volumes:
