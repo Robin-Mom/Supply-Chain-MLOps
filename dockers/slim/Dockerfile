@@ -5,13 +5,18 @@
 # 4/ gestion du backend selectif gpu ou cpu à paramétrer via BACKEND_EXTRA et en liens à la section uv/pyproject.tom
 
 # ─── ARG global (avant tout FROM) ──────────────────────────────────────────
+# Reçoit les variables au moment du build
 ARG BACKEND=cpu          # valeurs : cpu | gpu
+ARG DOCKFLD
+# Les rend disponibles au runtime
+#ENV BACKEND=$BACKEND
+#ENV DOCKFLD=$DOCKFLD
 
 # ════════════════════════════════════════════════════════════════════════════
 # STAGE 1 – builder  (compile les wheels, n'ira pas en prod dans le runtime)
 # ════════════════════════════════════════════════════════════════════════════
 FROM python:3.12-slim AS builder
-
+#redéclaration
 ARG BACKEND
 ARG DOCKFLD
 RUN echo "Invoqué depuis slim Dockerfile: ${DOCKFLD}"
@@ -25,9 +30,9 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 WORKDIR /build
 
 # On copie uniquement les fichiers de dépendances
-
-COPY ./requirements-base.txt .
-COPY ./requirements-${BACKEND}.txt .
+# attention on remote de ../.. donc il faut chercher dans $DOCKFLD
+COPY ${DOCKFLD}requirements-base.txt .
+COPY ${DOCKFLD}requirements-${BACKEND}.txt .
 
 # Installation dans un prefix isolé → facile à copier au stage suivant
 RUN pip install --no-cache-dir --prefix=/install -r requirements-${BACKEND}.txt
@@ -49,8 +54,10 @@ RUN PYTHONPATH=/install/lib/python3.12/site-packages \
 # STAGE 2 – runtime  (image finale, minimale)
 # ════════════════════════════════════════════════════════════════════════════
 FROM python:3.12-slim AS runtime
-
+#redéclaration
 ARG BACKEND
+ARG DOCKFLD
+
 # Label informatif embarqué dans l'image
 LABEL torch.backend="${BACKEND}"
 
