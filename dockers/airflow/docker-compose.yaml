@@ -117,7 +117,8 @@ services:
     ports:
       #- "8080:8080"                           # ← écoute sur toutes les interfaces
       #- "172.31.37.17:8080:8080"              # écoute selective de ce qui vient d'nginx seulement
-      - "${AIRFLOW_BIND_IP:-0.0.0.0}:8080:8080"  # écoute configurable : AIRFLOW_BIND_IP=192.168.1.42 docker compose ... ou .env
+      - "${AIRFLOW_BIND_IP:-0.0.0.0}:8080:8080"  
+        # écoute configurable : AIRFLOW_BIND_IP=192.168.1.42 docker compose ... ou .env
     healthcheck:
       test: ["CMD", "curl", "--fail", "http://localhost:8080/health"]
       interval: 30s

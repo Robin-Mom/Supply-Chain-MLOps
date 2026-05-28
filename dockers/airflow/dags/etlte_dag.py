@@ -24,7 +24,7 @@ def mflowPromote():
     print(f"Promote Runid:{run_id}")
 
 with DAG(
-    dag_id='my_first_dag',
+    dag_id='e_t_l_t_e',
     description='Ingest Extract push et promote model',
     tags=['Supply','Liora'],
     schedule_interval=None,
@@ -50,7 +50,7 @@ with DAG(
         #vérifier aussi ce que
         from airflow.providers.docker.operators.docker import DockerOperator
 
-        dans le train, trace output des metrics ou score
+        #dans le train, trace output des metrics ou score
         # dans ton script Python :
         import json
         theSilScore=0.72
