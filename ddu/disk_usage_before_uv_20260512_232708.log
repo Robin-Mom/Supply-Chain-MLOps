@@ -1,0 +1,35 @@
+=== DIAGNOSTIC À L'ÉTAPE: before_uv ===
+Date: Tue May 12 23:27:08 UTC 2026
+
+[0;34m=== DIAGNOSTIC D'ESPACE DISQUE (en Mo) - Tue May 12 23:27:08 UTC 2026 ===[0m
+
+[0;32m💾 Espace disque global[0m
+----------------------------------------
+[1;33mEspace disque total utilisé:[0m 13342 Mo
+[1;33mEspace disponible:[0m 10391 Mo
+
+[0;32m🐳 Docker[0m
+----------------------------------------
+[1;33mTaille des images Docker:[0m 0 Mo
+[1;33mTaille des conteneurs Docker:[0m 0 Mo
+[1;33mCache BuildKit:[0m 0 Mo
+[1;33mVolumes Docker:[0m 0 Mo
+[1;33mTotal Docker (estimé):[0m 0 Mo
+
+[0;32m🐍 uv et Python[0m
+----------------------------------------
+[1;33mCache uv local (~/.cache/uv):[0m 2934 Mo
+[1;33mCache uv personnalisé (UV_CACHE_DIR):[0m 0 Mo
+[1;33mDossier .venv local:[0m 2057 Mo
+[1;33mDossier .uv_cache (projet):[0m 0 Mo
+[1;33mTotal uv (estimé):[0m 2934 Mo
+
+[0;32m📁 Projet local[0m
+----------------------------------------
+[1;33mTaille du projet (.):[0m 3428 Mo
+[1;33mDossier node_modules:[0m 0 Mo
+[1;33mDossier __pycache__ + .pyc:[0m 0 Mo
+
+[0;32m📊 Résumé des ressources clés[0m
+----------------------------------------
+[1;33mTotal estimé (Docker + uv + projet):[0m 6362 Mo
