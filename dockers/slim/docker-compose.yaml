@@ -8,13 +8,19 @@ services:
         BACKEND: ${BACKEND:-cpu}
         DOCKFLD: ${DOCKFLD}
         #DAGSHUB_TOKEN: ${DAGSHUB_TOKEN}
-    image: ${COMPOSE_PROJECT_NAME:-mlopsv}-app:${API_VERSION:-1.0.0}           # ← nomme et tag l'image buildée, COMPOSE_PROJECT_NAME vient de -p
+    image: ${COMPOSE_PROJECT_NAME:-mlopsv}-app:${API_VERSION:-1.0.0}
     profiles:
       - building        # ← exclu du up classique
     command: echo "build only"   # ← ne fait rien, juste pour le build
   
   api:
-    image: ${COMPOSE_PROJECT_NAME:-mlopsv}-app:${API_VERSION:-1.0.0}           # ← nomme et tag l'image buildée, COMPOSE_PROJECT_NAME vient de -p
+    build:
+      context: ../..
+      dockerfile: ${DOCKFLD}Dockerfile
+      args:
+        BACKEND: ${BACKEND:-cpu}
+        DOCKFLD: ${DOCKFLD}
+    image: ${COMPOSE_PROJECT_NAME:-mlopsv}-app:${API_VERSION:-1.0.0}
     ports:
       - "8000:8000"
     volumes:
@@ -22,15 +28,13 @@ services:
       - /app/.venv
     env_file:
       - ../../.env
-    #networks:
-    #  - airflow_default  # ✅ référence uniquement DEBUNK uvicorn src.api:app --host 0.0.0.0 --port 8000 --reload
     command: ["uvicorn", "src.api:app", "--host", "0.0.0.0", "--port", "8000", "--reload"]
     healthcheck:
       test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/health')"]
       interval: 5s      # vérifie toutes les 5s
       timeout: 3s
-      retries: 10        # considère healthy après 5 succès
-      start_period: 60s # laisse 30s à l'API pour démarrer
+      retries: 10        # considère healthy après 10 succès
+      start_period: 60s # laisse 60s à l'API pour télécharger les modèles DVC/HuggingFace
 
   # Service 2 : Le Trainer (Cycle de vie ML)
   trainer:
@@ -43,12 +47,6 @@ services:
       - ../../.env
     # Ce container s'éteint tout seul une fois l'entraînement fini
     command: ["dvc", "repro", "--force"]
-
-# Démarrage normal — trainer ignoré
-#docker compose up -d
-# Lancer trainer manuellement si besoin et voir les trois options de lancement via dags ou mlflow 
-#docker compose --profile training run --rm trainer
-
 
 # app/docker-compose.yaml — rejoindre le réseau
 networks:
