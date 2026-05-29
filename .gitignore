@@ -37,6 +37,7 @@ logs/
 .dvc/config.local
 .dvc/cache/
 .dvc/tmp/
+.dvc/config*
 
 
 # ======================
@@ -54,4 +55,6 @@ dockers/nginx/certs/*.pem
 # Nginx - Authentification
 # ======================
 dockers/nginx/.htpasswd
-dockers/nginx/.htpasswd.*
+dockers/nginx/.htpasswd.*.DS_Store
+.DS_Store
+**/.DS_Store

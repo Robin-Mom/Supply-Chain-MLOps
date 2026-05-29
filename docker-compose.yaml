@@ -1,44 +1,44 @@
+version: '3.8'
+
 services:
-  # Service 1 : L'API (Inférence) Oscaro Trust Pilot
   api:
     build:
       context: .
-      dockerfile: docker/api.Dockerfile  # On peut avoir un Dockerfile spécifique pour l'API
-
+      dockerfile: docker/api.Dockerfile
+    container_name: pr007-api-1
     healthcheck:
-      #test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
       test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/health')"]
-      interval: 10s
-      timeout: 3s
-      retries: 30
-      start_period: 30s    # ← laisse le temps au lifespan de charger le modèle
-
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 60s    # Augmenté car le chargement du modèle est lourd
     ports:
       - "8000:8000"
     volumes:
-      - .:/app  # Permet de voir les modifs de code en temps réel (développement)
-      - /app/.venv
+      - ./src:/app/src     # Montre uniquement le code source, pas tout le dossier
+      - ./models:/app/models
     env_file:
-      - .env  # On va mettre tes identifiants DagsHub ici pour la sécurité
-    # On s'assure que l'API ne se lance que si les modèles sont là
+      - .env
+    # Suppression du --reload pour la stabilité en mode production
     command: ["uvicorn", "src.api:app", "--host", "0.0.0.0", "--port", "8000"]
-  
-  # Service 2 : Le Trainer (Cycle de vie ML)
+    networks:
+      - mlops_network      # Connecté au réseau interne
+
   trainer:
     build:
       context: .
-      dockerfile: docker/trainer.Dockerfile  # Un Dockerfile spécifique pour le trainer
+      dockerfile: docker/trainer.Dockerfile
+    container_name: pr007-trainer
     volumes:
       - .:/app
     env_file:
       - .env
     depends_on:
       api:
-        condition: service_healthy         
-    # Ce container s'éteint tout seul une fois l'entraînement fini
-    command: ["dvc", "repro", "--force"]
+        condition: service_healthy
+    networks:
+      - mlops_network
 
-# app/docker-compose.yaml — rejoindre le réseau
 networks:
-  airflow_default:
-    external: true               # réseau déjà créé par la stack Airflow
+  mlops_network:
+    driver: bridge

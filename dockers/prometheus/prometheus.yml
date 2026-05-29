@@ -14,8 +14,8 @@
       - job_name: "api"
         scrape_interval: 5s
         static_configs:
-         - targets: ["api:8000"]
-        metrics_path: /metrics
+         - targets: ["pr007-api-1:8000"]
+        metrics_path: /metrics_prom  # endpoint exposé par FastAPI pour Prometheus
 
       - job_name: "pushgateway"       
         scrape_interval: 3s
