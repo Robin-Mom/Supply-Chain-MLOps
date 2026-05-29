@@ -154,3 +154,7 @@ def get_metrics():
 @app.get("/metrics_prom", tags=["MLOps"])
 def get_metrics_prom():
     return Response(content=generate_latest(), media_type=CONTENT_TYPE_LATEST)
+
+@app.get("/", tags=["Toolbox"])
+def home():
+    return {"status": {"status": "online", "method": "Direct KMeans Inference"}}
