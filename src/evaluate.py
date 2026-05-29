@@ -92,6 +92,8 @@ def _cli():
     parser.add_argument("-en", "--experiment_name", default="Bertopic_Trustpilot_v4")
     parser.add_argument("-mn", "--model_name", default="trustpilot_bertopic_v4")
     parser.add_argument("-ap", "--artifact_path", default="model")
+    # Ajout de l'argument sep manquant
+    parser.add_argument("-sep", "--sep", default=",", help="Separator for CSV") 
     return vars(parser.parse_args())
 
 if __name__ == "__main__":
