@@ -1,6 +1,6 @@
 import pytest
 from fastapi.testclient import TestClient
-from unittest.mock import MagicMock
+from unittest.mock import patch, MagicMock
 from src.api import app, state
 
 # On injecte des mocks directement dans l'état de l'API
@@ -32,7 +32,7 @@ def test_predict_success():
 
 def test_trigger_train():
     # On mock juste le subprocess.run pour ne pas lancer DVC en vrai
-    with pytest.mock.patch("subprocess.run"):
+    with patch("subprocess.run"):
         response = client.post("/train")
         assert response.status_code == 200
         assert response.json()["status"] == "Training started"
