@@ -57,6 +57,6 @@ dockers/nginx/.htpasswd
 dockers/nginx/.htpasswd.*
 
 # ======================
-# Nginx - Authentification
+# data disk usage collection
 # ======================
 ddu/*
