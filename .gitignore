@@ -58,3 +58,9 @@ dockers/nginx/.htpasswd
 dockers/nginx/.htpasswd.*.DS_Store
 .DS_Store
 **/.DS_Store
+
+
+# ======================
+# data disk usage collection
+# ======================
+ddu/*
