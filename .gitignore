@@ -55,3 +55,8 @@ dockers/nginx/certs/*.pem
 # ======================
 dockers/nginx/.htpasswd
 dockers/nginx/.htpasswd.*
+
+# ======================
+# data disk usage collection
+# ======================
+ddu/*
