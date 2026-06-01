@@ -53,11 +53,10 @@ stages:
   evaluate:
     foreach: ${cluster_values}
     do:
-      # Suppression de -v et ajout de -sep ,
-      cmd: python src/evaluate.py -f models/${key}/artifacts/clusterized.csv -ri models/${key}/last_run_id.txt -ap models/${key}/artifacts -mo metrics/${key}/silhouette.json -sep ,
+      cmd: python src/evaluate.py -v -f models/${key}/artifacts/clusterized.csv -ri models/${key}/last_run_id.txt -ap models/${key}/artifacts -mo metrics/${key}/silhouette.json
       deps:
         - src/evaluate.py
         - models/${key}/artifacts/clusterized.csv
         - models/${key}/last_run_id.txt
       metrics:
-        - metrics/${key}/silhouette.json
+        - metrics/${key}/silhouette.json 
