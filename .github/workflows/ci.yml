@@ -2,7 +2,7 @@ name: Supply Chain MLOps CI
 
 on:
   push:
-    branches: [ main, feat/ci-pipeline ]
+    branches: [ main, feat/grafana ]
   pull_request:
     branches: [ main ]
 
