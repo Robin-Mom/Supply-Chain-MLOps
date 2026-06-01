@@ -37,6 +37,7 @@ logs/
 .dvc/config.local
 .dvc/cache/
 .dvc/tmp/
+.dvc/config*
 
 
 # ======================
@@ -55,6 +56,9 @@ dockers/nginx/certs/*.pem
 # ======================
 dockers/nginx/.htpasswd
 dockers/nginx/.htpasswd.*
+.DS_Store
+**/.DS_Store
+
 
 # ======================
 # data disk usage collection
