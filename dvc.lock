@@ -112,9 +112,9 @@ stages:
       md5: f5f78cf96045d9b8c0cf8bf3e3371919
       size: 32
   evaluate@c5:
-    cmd: python src/evaluate.py -f models/c5/artifacts/clusterized.csv -ri 
+    cmd: python src/evaluate.py -v -f models/c5/artifacts/clusterized.csv -ri 
       models/c5/last_run_id.txt -ap models/c5/artifacts -mo 
-      metrics/c5/silhouette.json -sep ,
+      metrics/c5/silhouette.json
     deps:
     - path: models/c5/artifacts/clusterized.csv
       hash: md5
@@ -126,17 +126,17 @@ stages:
       size: 32
     - path: src/evaluate.py
       hash: md5
-      md5: c025c3335908c3ace1201b1c2aa9c19e
-      size: 4013
+      md5: f49996fdae6f5d4e566b9f33404321ae
+      size: 5163
     outs:
     - path: metrics/c5/silhouette.json
       hash: md5
-      md5: 01a780a0761a5c4cd997a66cd87c9739
-      size: 48
+      md5: 6fedd64d9958acdc62341ae5ba958c6e
+      size: 47
   evaluate@c10:
-    cmd: python src/evaluate.py -f models/c10/artifacts/clusterized.csv -ri 
+    cmd: python src/evaluate.py -v -f models/c10/artifacts/clusterized.csv -ri 
       models/c10/last_run_id.txt -ap models/c10/artifacts -mo 
-      metrics/c10/silhouette.json -sep ,
+      metrics/c10/silhouette.json
     deps:
     - path: models/c10/artifacts/clusterized.csv
       hash: md5
@@ -148,17 +148,17 @@ stages:
       size: 32
     - path: src/evaluate.py
       hash: md5
-      md5: c025c3335908c3ace1201b1c2aa9c19e
-      size: 4013
+      md5: f49996fdae6f5d4e566b9f33404321ae
+      size: 5163
     outs:
     - path: metrics/c10/silhouette.json
       hash: md5
       md5: 86a3fbc99cfd794eb8d2d91de5d1d15b
       size: 48
   evaluate@c15:
-    cmd: python src/evaluate.py -f models/c15/artifacts/clusterized.csv -ri 
+    cmd: python src/evaluate.py -v -f models/c15/artifacts/clusterized.csv -ri 
       models/c15/last_run_id.txt -ap models/c15/artifacts -mo 
-      metrics/c15/silhouette.json -sep ,
+      metrics/c15/silhouette.json
     deps:
     - path: models/c15/artifacts/clusterized.csv
       hash: md5
@@ -170,8 +170,8 @@ stages:
       size: 32
     - path: src/evaluate.py
       hash: md5
-      md5: c025c3335908c3ace1201b1c2aa9c19e
-      size: 4013
+      md5: f49996fdae6f5d4e566b9f33404321ae
+      size: 5163
     outs:
     - path: metrics/c15/silhouette.json
       hash: md5
