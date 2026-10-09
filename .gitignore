@@ -12,12 +12,8 @@ wheels/
 .ml
 
 # --- CONFIGURATION DATA (GIT + DVC) ---
-# On ignore le contenu du dossier data
-data/*
-# Sauf les fichiers de configuration et de tracking DVC
-!data/.gitkeep
-!data/*.dvc
-!data/.gitignore
+/data/raw/
+/data/processed/
 
 # --- CONFIGURATION MODELS ---
 models/*
@@ -41,8 +37,6 @@ logs/
 .dvc/config.local
 .dvc/cache/
 .dvc/tmp/
-.dvc/config*
-
 
 # ======================
 # Nginx - Certificats SSL
