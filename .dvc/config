@@ -1,6 +1,0 @@
-[core]
-    no_scm = True
-    remote = origin
-    autostage = true    
-['remote "origin"']
-    url = https://dagshub.com/schmilblick-ai/Supply-Chain-MLOps.dvc

@@ -1,9 +1,0 @@
-#requirements-trainer-cpu.txt — torch CPU only :
-#pip
--r requirements-base.txt
-#NON --index-url https://download.pytorch.org/whl/cpu
-# Torch CPU-only depuis l'index PyTorch
-# --extra-index-url garde PyPI comme index principal
---extra-index-url https://download.pytorch.org/whl/cpu
-torch # CPU-only, ~200MB vs ~2GB pour le wheel CUDA
-#torchvision

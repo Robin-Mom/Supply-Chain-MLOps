@@ -1,6 +1,0 @@
-requirements-trainer-gpu.txt — torch CUDA 12.4 :
-pip
--r requirements-trainer-base.txt
---extra-index-url https://download.pytorch.org/whl/cu124
-torch
-torchvision
