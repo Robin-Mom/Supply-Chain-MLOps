@@ -64,3 +64,6 @@ dockers/nginx/.htpasswd.*
 # data disk usage collection
 # ======================
 ddu/*
+
+# others
+/draft.odt
