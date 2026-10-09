@@ -1,6 +1,7 @@
 # Python-generated files
 __pycache__/
 *.py[oc]
+*.py[cod]
 build/
 dist/
 wheels/
@@ -29,6 +30,9 @@ models/*
 !.vscode/settings.json
 .env
 .streamlit/secrets.toml
+.env.*
+!.env.example
+
 
 # Logs du pipeline (On ne les push pas sur Git)
 logs/
@@ -65,5 +69,6 @@ dockers/nginx/.htpasswd.*
 # ======================
 ddu/*
 
-# others
-/draft.odt
+# Jupyter
+.ipynb_checkpoints/
+
