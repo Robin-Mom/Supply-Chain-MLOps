@@ -65,4 +65,9 @@ ddu/*
 
 # Jupyter
 .ipynb_checkpoints/
+.virtual_documents/
+notebooks/anaconda_projects/
 
+# mlflow local tracking
+mlartifacts/
+mlflow.db
