@@ -5,11 +5,24 @@ description = "Add your description here"
 readme = "README.md"
 requires-python = ">=3.12"
 dependencies = [
+    "bertopic>=0.17.4",
     "dvc[s3]>=3.67.1",
+    "langdetect>=1.0.9",
+    "matplotlib>=3.11.2",
+    "mlflow>=3.17.0",
+    "pandas>=3.0.6",
+    "scikit-learn>=1.9.1",
+    "seaborn>=0.13.2",
+    "sentence-transformers>=6.1.0",
+    "soyclustering>=0.2.0",
+    "spacy>=3.8.16",
+    "spherecluster>=0.1.7",
+    "wordcloud>=1.9.6",
 ]
 
 [dependency-groups]
 dev = [
+    "dagshub>=0.7.2",
     "ipykernel>=7.4.0",
     "jupyterlab>=4.6.4",
 ]
