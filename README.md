@@ -1,6 +1,6 @@
 # Supply Chain MLOps - Client reviews unsupervised clustering 
 
-This project stems from a collective work produced in the context of Liora Machine Learning engineering formation. The current version of it has been reframed entirely for learning purposes.
+This project stems from a collective work produced in the context of ![Liora Machine Learning engineering formation](https://liora.io/formation/data-ia/machine-learning-engineer). The current version of it has been reframed entirely for learning purposes.
 This work has been both an organizational and technical challenge. Both aspects are documented in the present README file.
 
 ## Technicalities
