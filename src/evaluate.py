@@ -1,7 +1,7 @@
 """Evaluate geometry, c-TF-IDF keywords and clustering stability.
 
 Default evaluation uses saved training embeddings and labels. --input evaluates
-new reviews with a frozen KMeans model. Stability explicitly refits models and
+new reviews with a frozen KMeans or Spherical KMeans model. Stability explicitly refits models and
 is restricted to the training data; it is opt-in because it can be expensive.
 """
 from __future__ import annotations
@@ -18,6 +18,7 @@ import pandas as pd
 from sklearn.metrics import silhouette_score, davies_bouldin_score, adjusted_rand_score
 
 from train import METHODS, fit_clustering, load_reviews, write_json
+from tracking import configure_tracking
 
 
 def evaluate_clustering(X, labels, sample_size=5000, seed=42, metric="cosine"):
@@ -137,8 +138,9 @@ def main(argv=None):
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--artifact-dir", type=Path, required=True)
     parser.add_argument("--output-dir", type=Path, required=True)
+    parser.add_argument("--metrics-output", type=Path, help="Optional combined JSON metrics for DVC.")
     parser.add_argument("--methods", nargs="+", choices=METHODS)
-    parser.add_argument("--input", type=Path, help="Optional held-out CSV; only KMeans variants support this.")
+    parser.add_argument("--input", type=Path, help="Optional held-out CSV evaluated with the saved models.")
     parser.add_argument("--text-column", default="commentaire")
     parser.add_argument("--device")
     parser.add_argument("--batch-size", type=int, default=32)
@@ -153,16 +155,31 @@ def main(argv=None):
     args = parser.parse_args(argv)
     metadata = json.loads((args.artifact_dir / "metadata.json").read_text())
     methods = list(dict.fromkeys(args.methods or metadata["methods"]))
+    if any(m not in METHODS for m in methods):
+        parser.error(f"Supported methods are: {METHODS}.")
     if any(m not in metadata["methods"] for m in methods):
         parser.error("One or more requested methods were not trained.")
     if args.output_dir.exists():
         parser.error("Output directory already exists; choose a new directory.")
-    if args.input and (args.stability or any(m not in {"kmeans", "spherical_kmeans"} for m in methods)):
-        parser.error("Held-out evaluation requires KMeans variants and no stability refitting.")
+    if args.metrics_output and args.metrics_output.exists():
+        parser.error("Metrics file already exists; choose a new path.")
+    if args.input and args.stability:
+        parser.error("Stability refitting is restricted to training data.")
     if args.silhouette_sample_size < 0 or args.batch_size < 1:
         parser.error("Invalid sample size or batch size.")
     if args.stability and (args.n_repeats < 2 or not 0 < args.sample_fraction <= 1):
         parser.error("Stability requires n-repeats >= 2 and 0 < sample-fraction <= 1.")
+    runs = {}
+    if args.log_mlflow:
+        for method in methods:
+            info_path = args.artifact_dir / method / "mlflow_run.json"
+            if not info_path.exists():
+                parser.error("No recorded MLflow run. Enable tracking during training first.")
+            runs[method] = json.loads(info_path.read_text())
+            try:
+                configure_tracking(runs[method]["tracking_uri"])
+            except ValueError as error:
+                parser.error(str(error))
     if args.input:
         from predict import predict_reviews, load_bundle, predict_embeddings
         _, texts = load_reviews(args.input, args.text_column)
@@ -171,16 +188,14 @@ def main(argv=None):
         X = np.load(args.artifact_dir / "embeddings.npy", allow_pickle=False)
         texts = pd.read_csv(args.artifact_dir / "texts.csv")["text"].to_numpy()
     args.output_dir.mkdir(parents=True)
+    combined_metrics = {}
     for method in methods:
         directory = args.output_dir / method
         directory.mkdir()
         source = args.artifact_dir / method
         labels = predict_embeddings(load_bundle(args.artifact_dir, method), X) if args.input else np.load(source / "labels.npy", allow_pickle=False)
         metrics = evaluate_clustering(X, labels, args.silhouette_sample_size, args.seed)
-        if method == "umap_hdbscan":
-            reduced = np.load(source / "reduced_embeddings.npy", allow_pickle=False)
-            reduced_metrics = evaluate_clustering(reduced, labels, args.silhouette_sample_size, args.seed, "euclidean")
-            metrics["silhouette_umap"] = reduced_metrics["silhouette_euclidean"]
+        combined_metrics[method] = metrics
         write_json(directory / "metrics.json", metrics)
         write_json(directory / "evaluation_config.json", {"dataset": "held_out" if args.input else "training",
                    "input": str(args.input) if args.input else None, "seed": args.seed,
@@ -209,16 +224,16 @@ def main(argv=None):
                     plt.close(fig)
         if args.log_mlflow:
             import mlflow
-            info_path = source / "mlflow_run.json"
-            if not info_path.exists():
-                raise ValueError("No recorded MLflow run. Train with --tracking-uri first.")
-            info = json.loads(info_path.read_text())
-            mlflow.set_tracking_uri(info["tracking_uri"])
+            info = runs[method]
+            configure_tracking(info["tracking_uri"])
             prefix = "held_out" if args.input else "training"
             with mlflow.start_run(run_id=info["run_id"]):
                 mlflow.log_metrics({f"{prefix}_{k}": v for k, v in metrics.items() if v is not None})
                 mlflow.log_artifacts(str(directory), artifact_path=f"evaluation/{prefix}/{args.output_dir.name}")
         print(f"{method}: {json.dumps(metrics)}", flush=True)
+    if args.metrics_output:
+        args.metrics_output.parent.mkdir(parents=True, exist_ok=True)
+        write_json(args.metrics_output, combined_metrics)
 
 
 if __name__ == "__main__":
