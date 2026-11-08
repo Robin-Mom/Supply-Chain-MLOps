@@ -180,6 +180,11 @@ def main(argv=None):
                 configure_tracking(runs[method]["tracking_uri"])
             except ValueError as error:
                 parser.error(str(error))
+            import mlflow
+            recorded = mlflow.MlflowClient().get_run(runs[method]["run_id"])
+            expected = runs[method].get("experiment_id")
+            if expected is not None and str(expected) != recorded.info.experiment_id:
+                parser.error(f"{method}: recorded run belongs to a different experiment.")
     if args.input:
         from predict import predict_reviews, load_bundle, predict_embeddings
         _, texts = load_reviews(args.input, args.text_column)
@@ -226,8 +231,13 @@ def main(argv=None):
             import mlflow
             info = runs[method]
             configure_tracking(info["tracking_uri"])
+            recorded = mlflow.MlflowClient().get_run(info["run_id"])
+            mlflow.set_experiment(experiment_id=recorded.info.experiment_id)
             prefix = "held_out" if args.input else "training"
             with mlflow.start_run(run_id=info["run_id"]):
+                mlflow.set_tags({"mlflow.runType": "training", "mlflow.runSourceType": "training"})
+                print(f"MLflow evaluation: method={method}, run_id={info['run_id']}, "
+                      f"experiment_id={mlflow.active_run().info.experiment_id}", flush=True)
                 mlflow.log_metrics({f"{prefix}_{k}": v for k, v in metrics.items() if v is not None})
                 mlflow.log_artifacts(str(directory), artifact_path=f"evaluation/{prefix}/{args.output_dir.name}")
         print(f"{method}: {json.dumps(metrics)}", flush=True)

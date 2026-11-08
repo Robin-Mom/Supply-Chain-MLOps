@@ -6,8 +6,11 @@ train:
   encoder: sentence-transformers/paraphrase-multilingual-mpnet-base-v2
   batch_size: 32
   n_clusters: 10
+  n_init: 10
+  max_iter: 300
   seed: 42
-  experiment: Supply-chain_model-selection
+  tracking_uri: sqlite:///mlflow.db
+  experiment: Supply-chain_model-selection_Test
   # Optional CLI flags, e.g. --revision <encoder-commit> --device cpu
   extra_args: ""
 
@@ -16,6 +19,9 @@ evaluate:
   seed: 42
   n_repeats: 10
   sample_fraction: 0.8
-  # Set to --log-mlflow when training uses MLFLOW_TRACKING_URI.
   # Stability example: --stability statistical algorithmic global --plot
-  extra_args: ""
+  extra_args: "--log-mlflow"
+
+selection:
+  metric: silhouette_cosine
+  direction: maximize

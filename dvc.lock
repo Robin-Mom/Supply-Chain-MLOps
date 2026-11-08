@@ -1,0 +1,142 @@
+schema: '2.0'
+stages:
+  train:
+    cmd: 'python src/train.py --input "data/raw/avis_24k_train.csv" --output-dir models/clustering
+      --text-column "commentaire" --methods kmeans spherical_kmeans --encoder "sentence-transformers/paraphrase-multilingual-mpnet-base-v2"
+      --batch-size 32 --n-clusters 10 --n-init 10 --max-iter 300 --seed 42 --tracking-uri
+      "sqlite:///mlflow.db" --experiment "Supply-chain_model-selection_Test" '
+    deps:
+    - path: data/raw/avis_24k_train.csv
+      hash: md5
+      md5: 96bb984f19839bd690030e01c8573f98
+      size: 10055249
+    - path: pyproject.toml
+      hash: md5
+      md5: 07ef3327d18d9f5853605bac05ca3015
+      size: 595
+    - path: src/tracking.py
+      hash: md5
+      md5: 14e2b14ed6b9b48d49d8556d7be3d408
+      size: 2054
+    - path: src/train.py
+      hash: md5
+      md5: 41272052e421efb565915ce721f5fdde
+      size: 12287
+    - path: uv.lock
+      hash: md5
+      md5: d8c0d7574f27a8d719b365928123072c
+      size: 1111959
+    params:
+      params.yaml:
+        data:
+          input: data/raw/avis_24k_train.csv
+          text_column: commentaire
+        train:
+          encoder: sentence-transformers/paraphrase-multilingual-mpnet-base-v2
+          batch_size: 32
+          n_clusters: 10
+          n_init: 10
+          max_iter: 300
+          seed: 42
+          tracking_uri: sqlite:///mlflow.db
+          experiment: Supply-chain_model-selection_Test
+          extra_args: ''
+    outs:
+    - path: models/clustering
+      hash: md5
+      md5: ee1d0cfe89ed922da75f2eaaa87a0a37.dir
+      size: 1280515783
+      nfiles: 20
+  evaluate:
+    cmd: python src/evaluate.py --artifact-dir models/clustering --output-dir 
+      reports/clustering --metrics-output metrics/clustering.json 
+      --silhouette-sample-size 5000 --seed 42 --n-repeats 10 --sample-fraction 
+      0.8 --log-mlflow
+    deps:
+    - path: models/clustering
+      hash: md5
+      md5: ee1d0cfe89ed922da75f2eaaa87a0a37.dir
+      size: 1280515783
+      nfiles: 20
+    - path: pyproject.toml
+      hash: md5
+      md5: 07ef3327d18d9f5853605bac05ca3015
+      size: 595
+    - path: src/evaluate.py
+      hash: md5
+      md5: c00803a6d1fb957dc08fbc8b79fdd73e
+      size: 13786
+    - path: src/tracking.py
+      hash: md5
+      md5: 14e2b14ed6b9b48d49d8556d7be3d408
+      size: 2054
+    - path: src/train.py
+      hash: md5
+      md5: 41272052e421efb565915ce721f5fdde
+      size: 12287
+    - path: uv.lock
+      hash: md5
+      md5: d8c0d7574f27a8d719b365928123072c
+      size: 1111959
+    params:
+      params.yaml:
+        evaluate:
+          silhouette_sample_size: 5000
+          seed: 42
+          n_repeats: 10
+          sample_fraction: 0.8
+          extra_args: --log-mlflow
+    outs:
+    - path: metrics/clustering.json
+      hash: md5
+      md5: db3feb4a841648dc569cf80bbb44e283
+      size: 560
+    - path: reports/clustering
+      hash: md5
+      md5: 7647530a51671e6aa8409654a2a1c9e6.dir
+      size: 6244351
+      nfiles: 8
+  select:
+    cmd: python src/select_model.py --metrics metrics/clustering.json 
+      --artifact-dir models/clustering --output reports/selection.json --metric 
+      silhouette_cosine --direction maximize
+    deps:
+    - path: metrics/clustering.json
+      hash: md5
+      md5: db3feb4a841648dc569cf80bbb44e283
+      size: 560
+    - path: models/clustering
+      hash: md5
+      md5: ee1d0cfe89ed922da75f2eaaa87a0a37.dir
+      size: 1280515783
+      nfiles: 20
+    - path: pyproject.toml
+      hash: md5
+      md5: 07ef3327d18d9f5853605bac05ca3015
+      size: 595
+    - path: src/select_model.py
+      hash: md5
+      md5: 879ee29ab45da13089cbf95d7020c6e9
+      size: 3259
+    - path: src/tracking.py
+      hash: md5
+      md5: 14e2b14ed6b9b48d49d8556d7be3d408
+      size: 2054
+    - path: src/train.py
+      hash: md5
+      md5: 41272052e421efb565915ce721f5fdde
+      size: 12287
+    - path: uv.lock
+      hash: md5
+      md5: d8c0d7574f27a8d719b365928123072c
+      size: 1111959
+    params:
+      params.yaml:
+        selection:
+          metric: silhouette_cosine
+          direction: maximize
+    outs:
+    - path: reports/selection.json
+      hash: md5
+      md5: 38d069681d9a0eaa5bc7f3f8723e8d60
+      size: 792

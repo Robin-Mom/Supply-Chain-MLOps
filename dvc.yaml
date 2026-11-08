@@ -9,7 +9,10 @@ stages:
       --encoder "${train.encoder}"
       --batch-size ${train.batch_size}
       --n-clusters ${train.n_clusters}
+      --n-init ${train.n_init}
+      --max-iter ${train.max_iter}
       --seed ${train.seed}
+      --tracking-uri "${train.tracking_uri}"
       --experiment "${train.experiment}"
       ${train.extra_args}
     deps:
@@ -49,3 +52,24 @@ stages:
     metrics:
       - metrics/clustering.json:
           cache: false
+
+  select:
+    cmd: >-
+      python src/select_model.py
+      --metrics metrics/clustering.json
+      --artifact-dir models/clustering
+      --output reports/selection.json
+      --metric ${selection.metric}
+      --direction ${selection.direction}
+    deps:
+      - metrics/clustering.json
+      - models/clustering
+      - src/select_model.py
+      - src/train.py
+      - src/tracking.py
+      - pyproject.toml
+      - uv.lock
+    params:
+      - selection
+    outs:
+      - reports/selection.json
