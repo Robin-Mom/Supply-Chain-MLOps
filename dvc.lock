@@ -1,12 +1,13 @@
 schema: '2.0'
 stages:
   train:
-    cmd: 'python src/train.py --input "data/raw/avis_24k_train.csv" --output-dir models/clustering
-      --text-column "commentaire" --methods kmeans spherical_kmeans --encoder "sentence-transformers/paraphrase-multilingual-mpnet-base-v2"
-      --batch-size 32 --n-clusters 10 --n-init 10 --max-iter 300 --seed 42 --tracking-uri
-      "sqlite:///mlflow.db" --experiment "Supply-chain_model-selection_Test" '
+    cmd: 'python src/train.py --input "data/processed/avis_24k_train.csv" --output-dir
+      models/clustering --text-column "commentaire" --methods kmeans spherical_kmeans
+      --encoder "sentence-transformers/paraphrase-multilingual-mpnet-base-v2" --batch-size
+      32 --n-clusters 10 --n-init 10 --max-iter 300 --seed 42 --tracking-uri "sqlite:///mlflow.db"
+      --experiment "Supply-chain_model-selection_Test" '
     deps:
-    - path: data/raw/avis_24k_train.csv
+    - path: data/processed/avis_24k_train.csv
       hash: md5
       md5: 96bb984f19839bd690030e01c8573f98
       size: 10055249
@@ -29,7 +30,7 @@ stages:
     params:
       params.yaml:
         data:
-          input: data/raw/avis_24k_train.csv
+          input: data/processed/avis_24k_train.csv
           text_column: commentaire
         train:
           encoder: sentence-transformers/paraphrase-multilingual-mpnet-base-v2
@@ -44,7 +45,7 @@ stages:
     outs:
     - path: models/clustering
       hash: md5
-      md5: ee1d0cfe89ed922da75f2eaaa87a0a37.dir
+      md5: bfe6d3090cff5f088461caf5d707fd7c.dir
       size: 1280515783
       nfiles: 20
   evaluate:
@@ -55,7 +56,7 @@ stages:
     deps:
     - path: models/clustering
       hash: md5
-      md5: ee1d0cfe89ed922da75f2eaaa87a0a37.dir
+      md5: bfe6d3090cff5f088461caf5d707fd7c.dir
       size: 1280515783
       nfiles: 20
     - path: pyproject.toml
@@ -107,7 +108,7 @@ stages:
       size: 560
     - path: models/clustering
       hash: md5
-      md5: ee1d0cfe89ed922da75f2eaaa87a0a37.dir
+      md5: bfe6d3090cff5f088461caf5d707fd7c.dir
       size: 1280515783
       nfiles: 20
     - path: pyproject.toml
