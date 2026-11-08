@@ -1,0 +1,21 @@
+data:
+  input: data/raw/avis_24k_train.csv
+  text_column: commentaire
+
+train:
+  encoder: sentence-transformers/paraphrase-multilingual-mpnet-base-v2
+  batch_size: 32
+  n_clusters: 10
+  seed: 42
+  experiment: Supply-chain_model-selection
+  # Optional CLI flags, e.g. --revision <encoder-commit> --device cpu
+  extra_args: ""
+
+evaluate:
+  silhouette_sample_size: 5000
+  seed: 42
+  n_repeats: 10
+  sample_fraction: 0.8
+  # Set to --log-mlflow when training uses MLFLOW_TRACKING_URI.
+  # Stability example: --stability statistical algorithmic global --plot
+  extra_args: ""

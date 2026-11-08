@@ -1,8 +1,6 @@
 """Assign new reviews to an existing KMeans or Spherical KMeans model.
 
-No estimator is fitted in this module. scikit-learn HDBSCAN has no predict
-method and is deliberately rejected rather than replaced with a heuristic.
-Source: https://scikit-learn.org/stable/modules/generated/sklearn.cluster.HDBSCAN.html
+No estimator is fitted in this module.
 """
 from __future__ import annotations
 
@@ -12,14 +10,13 @@ from pathlib import Path
 import joblib
 import numpy as np
 
-from train import load_reviews, validate_embeddings
+from train import METHODS, load_reviews, validate_embeddings
 
 
 def load_bundle(artifact_dir, method):
     """Load a trusted local bundle; never load untrusted joblib files."""
-    if method not in {"kmeans", "spherical_kmeans"}:
-        raise ValueError("New-data prediction is supported only for kmeans and spherical_kmeans. "
-                         "The notebook uses sklearn.cluster.HDBSCAN, which has no predict method.")
+    if method not in METHODS:
+        raise ValueError(f"Unsupported method: {method}. Choose from {METHODS}.")
     bundle = joblib.load(Path(artifact_dir) / method / "model.joblib")
     if bundle["method"] != method:
         raise ValueError("The model bundle does not match the requested method.")
@@ -28,6 +25,8 @@ def load_bundle(artifact_dir, method):
 
 def predict_embeddings(bundle, embeddings):
     """Predict labels in the same normalized space used during training."""
+    if bundle["method"] not in METHODS:
+        raise ValueError(f"Unsupported method: {bundle['method']}")
     X = validate_embeddings(embeddings)
     if X.shape[1] != bundle["n_features"]:
         raise ValueError("Embedding dimensions do not match the trained model.")
@@ -52,7 +51,7 @@ def main(argv=None):
     parser.add_argument("--input", type=Path, required=True)
     parser.add_argument("--output", type=Path, required=True)
     parser.add_argument("--artifact-dir", type=Path, required=True)
-    parser.add_argument("--method", choices=("kmeans", "spherical_kmeans"), required=True)
+    parser.add_argument("--method", choices=METHODS, required=True)
     parser.add_argument("--text-column", default="commentaire")
     parser.add_argument("--device")
     parser.add_argument("--batch-size", type=int, default=32)

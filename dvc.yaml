@@ -1,0 +1,51 @@
+stages:
+  train:
+    cmd: >-
+      python src/train.py
+      --input "${data.input}"
+      --output-dir models/clustering
+      --text-column "${data.text_column}"
+      --methods kmeans spherical_kmeans
+      --encoder "${train.encoder}"
+      --batch-size ${train.batch_size}
+      --n-clusters ${train.n_clusters}
+      --seed ${train.seed}
+      --experiment "${train.experiment}"
+      ${train.extra_args}
+    deps:
+      - ${data.input}
+      - src/train.py
+      - src/tracking.py
+      - pyproject.toml
+      - uv.lock
+    params:
+      - data
+      - train
+    outs:
+      - models/clustering
+
+  evaluate:
+    cmd: >-
+      python src/evaluate.py
+      --artifact-dir models/clustering
+      --output-dir reports/clustering
+      --metrics-output metrics/clustering.json
+      --silhouette-sample-size ${evaluate.silhouette_sample_size}
+      --seed ${evaluate.seed}
+      --n-repeats ${evaluate.n_repeats}
+      --sample-fraction ${evaluate.sample_fraction}
+      ${evaluate.extra_args}
+    deps:
+      - models/clustering
+      - src/evaluate.py
+      - src/train.py
+      - src/tracking.py
+      - pyproject.toml
+      - uv.lock
+    params:
+      - evaluate
+    outs:
+      - reports/clustering
+    metrics:
+      - metrics/clustering.json:
+          cache: false

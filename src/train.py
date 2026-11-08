@@ -1,8 +1,8 @@
-"""Train the four clustering strategies from 02_experimentation.ipynb.
+"""Train KMeans and Spherical KMeans on normalized review embeddings.
 
 The pretrained text encoder is used as-is, without fine-tuning.
 Run `python train.py --help` for command-line options.
-Keep train.py, evaluate.py and predict.py in the same directory.
+Keep train.py, evaluate.py, predict.py and tracking.py in the same directory.
 """
 from __future__ import annotations
 
@@ -17,11 +17,13 @@ import joblib
 import numpy as np
 import pandas as pd
 from sklearn.base import BaseEstimator, ClusterMixin
-from sklearn.cluster import KMeans, HDBSCAN, kmeans_plusplus
+from sklearn.cluster import KMeans, kmeans_plusplus
 from sklearn.preprocessing import normalize
 from sklearn.utils.validation import check_is_fitted
 
-METHODS = ("kmeans", "spherical_kmeans", "hdbscan", "umap_hdbscan")
+from tracking import configure_tracking
+
+METHODS = ("kmeans", "spherical_kmeans")
 DEFAULT_ENCODER = "sentence-transformers/paraphrase-multilingual-mpnet-base-v2"
 
 
@@ -131,37 +133,21 @@ def default_config(n_clusters=10, seed=42):
     return {
         "kmeans": {"n_clusters": n_clusters, "n_init": 10, "random_state": seed},
         "spherical_kmeans": {"n_clusters": n_clusters, "n_init": 5, "max_iter": 100, "random_state": seed},
-        "hdbscan": {"min_cluster_size": 50, "min_samples": 10, "metric": "euclidean", "n_jobs": -1},
-        "umap_hdbscan": {"min_cluster_size": 125, "min_samples": 10, "metric": "euclidean", "cluster_selection_method": "eom", "n_jobs": -1},
-        "umap": {"n_components": 15, "n_neighbors": 30, "min_dist": 0.0, "metric": "cosine", "random_state": seed},
     }
 
 
 def fit_clustering(X, method, config, seed=None):
-    """Fit one strategy and return estimator, reducer, labels and fit space."""
+    """Fit one strategy and return estimator, None, labels and embeddings."""
     if method not in METHODS:
         raise ValueError(f"Unknown method: {method}")
     params = dict(config[method])
-    reducer = None
-    fit_space = X
-    if method in {"kmeans", "spherical_kmeans"}:
-        if seed is not None:
-            params["random_state"] = seed
-        cls = KMeans if method == "kmeans" else SphericalKMeans
-        model = cls(**params)
-    else:
-        if method == "umap_hdbscan":
-            import umap
-            umap_params = dict(config["umap"])
-            if seed is not None:
-                umap_params["random_state"] = seed
-            if len(X) <= umap_params["n_components"] + 1:
-                raise ValueError("Too few observations for the configured UMAP dimensions.")
-            reducer = umap.UMAP(**umap_params)
-            fit_space = reducer.fit_transform(X)
-        model = HDBSCAN(**params)
-    labels = model.fit_predict(fit_space)
-    return model, reducer, labels, fit_space
+    if seed is not None:
+        params["random_state"] = seed
+    cls = KMeans if method == "kmeans" else SphericalKMeans
+    model = cls(**params)
+    labels = model.fit_predict(X)
+    # Preserve the fit-result interface used by stability evaluation.
+    return model, None, labels, X
 
 
 def main(argv=None):
@@ -177,14 +163,23 @@ def main(argv=None):
     parser.add_argument("--batch-size", type=int, default=32)
     parser.add_argument("--n-clusters", type=int, default=10)
     parser.add_argument("--seed", type=int, default=42)
-    parser.add_argument("--config", type=Path, help="JSON overrides grouped by method and umap.")
-    parser.add_argument("--tracking-uri", help="Enable MLflow tracking, e.g. http://127.0.0.1:5000.")
-    parser.add_argument("--experiment", default="Supply-chain-baseline")
+    parser.add_argument("--config", type=Path, help="JSON overrides grouped by supported method.")
+    tracking = parser.add_mutually_exclusive_group()
+    tracking.add_argument("--tracking-uri", help="MLflow server URI; defaults to MLFLOW_TRACKING_URI.")
+    tracking.add_argument("--dagshub-repo", help="Track on DagsHub: OWNER/REPOSITORY.")
+    parser.add_argument("--experiment", default="Supply-chain_model-selection")
     args = parser.parse_args(argv)
     if args.output_dir.exists():
         parser.error("Output directory already exists; choose a new directory.")
     if args.batch_size < 1:
         parser.error("batch-size must be positive.")
+    try:
+        tracking_uri = configure_tracking(args.tracking_uri, args.dagshub_repo)
+    except ValueError as error:
+        parser.error(str(error))
+    if tracking_uri:
+        import mlflow
+        mlflow.set_experiment(args.experiment)
     _, texts = load_reviews(args.input, args.text_column)
     config = default_config(args.n_clusters, args.seed)
     if args.config:
@@ -202,7 +197,7 @@ def main(argv=None):
     np.save(args.output_dir / "embeddings.npy", X)
     pd.DataFrame({"text": texts}).to_csv(args.output_dir / "texts.csv", index=False)
     packages = {}
-    for package in ("numpy", "pandas", "scikit-learn", "sentence-transformers", "umap-learn", "joblib", "mlflow", "bertopic", "spacy"):
+    for package in ("numpy", "pandas", "scikit-learn", "sentence-transformers", "joblib", "mlflow", "bertopic", "spacy"):
         try:
             packages[package] = version(package)
         except PackageNotFoundError:
@@ -215,34 +210,29 @@ def main(argv=None):
     for method in metadata["methods"]:
         print(f"Training {method} on {X.shape}...", flush=True)
         start = perf_counter()
-        model, reducer, labels, fit_space = fit_clustering(X, method, config)
+        model, _, labels, _ = fit_clustering(X, method, config)
         directory = args.output_dir / method
         directory.mkdir()
-        joblib.dump({"method": method, "model": model, "reducer": reducer,
+        joblib.dump({"method": method, "model": model,
                      "n_features": X.shape[1]}, directory / "model.joblib")
         np.save(directory / "labels.npy", labels)
-        if reducer is not None:
-            np.save(directory / "reduced_embeddings.npy", fit_space)
         training_metrics = {"fit_seconds": perf_counter() - start}
         if hasattr(model, "inertia_"):
             training_metrics["inertia"] = float(model.inertia_)
         write_json(directory / "training_metrics.json", training_metrics)
-        if args.tracking_uri:
+        if tracking_uri:
             import mlflow
-            mlflow.set_tracking_uri(args.tracking_uri)
-            mlflow.set_experiment(args.experiment)
             with mlflow.start_run(run_name=f"mpnet-{method}") as run:
+                write_json(directory / "mlflow_run.json", {"run_id": run.info.run_id, "tracking_uri": tracking_uri})
                 mlflow.log_params({"method": method, "encoder": args.encoder, "normalize_embeddings": True,
                                    **config[method]})
-                if reducer is not None:
-                    mlflow.log_params({f"umap_{k}": v for k, v in config["umap"].items()})
                 mlflow.log_metrics(training_metrics)
                 # Store portable artifacts; these are not MLflow flavor models.
                 mlflow.log_artifacts(str(directory), artifact_path="clustering")
                 mlflow.log_artifacts(str(args.output_dir / "encoder"), artifact_path="encoder")
                 mlflow.log_artifact(str(args.output_dir / "metadata.json"))
                 mlflow.log_artifact(__file__, artifact_path="source")
-                write_json(directory / "mlflow_run.json", {"run_id": run.info.run_id, "tracking_uri": args.tracking_uri})
+                mlflow.log_artifact(str(Path(__file__).with_name("tracking.py")), artifact_path="source")
         print(f"Saved {directory}", flush=True)
 
 
