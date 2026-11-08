@@ -1,5 +1,5 @@
 data:
-  input: data/raw/avis_24k_train.csv
+  input: data/processed/avis_24k_train.csv
   text_column: commentaire
 
 train:

@@ -11,14 +11,14 @@ KMeans and Spherical KMeans. Git and DVC remotes are preserved as configured.
 uv sync --frozen
 source .venv/bin/activate
 # If the input data is missing, retrieve it from the existing configured remote:
-dvc pull data/raw.dvc
+dvc pull data/processed.dvc
 dvc repro
 dvc metrics show
 mlflow ui --backend-store-uri sqlite:///mlflow.db
 ```
 
 Set the CSV path and text column in `params.yaml`. The default input is
-`data/raw/avis_24k_train.csv`, with a `commentaire` column. Blank reviews are
+`data/processed/avis_24k_train.csv`, with a `commentaire` column. Blank reviews are
 rejected rather than silently dropped. Data access uses the existing DVC
 configuration and any credentials you supply separately.
 
