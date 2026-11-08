@@ -1,0 +1,6 @@
+outs:
+- md5: 2042cfe9e048b6604f06a7a64a2bfc4a.dir
+  size: 10055331
+  nfiles: 2
+  hash: md5
+  path: train_eval
