@@ -162,6 +162,8 @@ def main(argv=None):
     parser.add_argument("--device", default=None)
     parser.add_argument("--batch-size", type=int, default=32)
     parser.add_argument("--n-clusters", type=int, default=10)
+    parser.add_argument("--n-init", type=int, help="Override initialization count for both methods.")
+    parser.add_argument("--max-iter", type=int, help="Override iteration limit for both methods.")
     parser.add_argument("--seed", type=int, default=42)
     parser.add_argument("--config", type=Path, help="JSON overrides grouped by supported method.")
     tracking = parser.add_mutually_exclusive_group()
@@ -179,14 +181,27 @@ def main(argv=None):
         parser.error(str(error))
     if tracking_uri:
         import mlflow
-        mlflow.set_experiment(args.experiment)
+        experiment = mlflow.set_experiment(args.experiment)
+        print(f"MLflow: tracking_uri={mlflow.get_tracking_uri()}, "
+              f"experiment={experiment.name}, experiment_id={experiment.experiment_id}", flush=True)
     _, texts = load_reviews(args.input, args.text_column)
     config = default_config(args.n_clusters, args.seed)
+    for values in config.values():
+        if args.n_init is not None:
+            values["n_init"] = args.n_init
+        if args.max_iter is not None:
+            values["max_iter"] = args.max_iter
     if args.config:
         for key, values in json.loads(args.config.read_text()).items():
             if key not in config or not isinstance(values, dict):
                 parser.error(f"Invalid configuration section: {key}")
             config[key].update(values)
+    for method in args.methods:
+        values = config[method]
+        if not 1 <= values["n_clusters"] <= len(texts):
+            parser.error(f"{method}: n_clusters must be between 1 and the sample count.")
+        if values["n_init"] < 1 or values.get("max_iter", 300) < 1:
+            parser.error(f"{method}: n_init and max_iter must be positive.")
     from sentence_transformers import SentenceTransformer
     encoder = SentenceTransformer(args.encoder, revision=args.revision, device=args.device,
                                   trust_remote_code=False, model_kwargs={"use_safetensors": True})
@@ -222,8 +237,16 @@ def main(argv=None):
         write_json(directory / "training_metrics.json", training_metrics)
         if tracking_uri:
             import mlflow
-            with mlflow.start_run(run_name=f"mpnet-{method}") as run:
-                write_json(directory / "mlflow_run.json", {"run_id": run.info.run_id, "tracking_uri": tracking_uri})
+            with mlflow.start_run(
+                experiment_id=experiment.experiment_id, run_name=f"mpnet-{method}",
+                tags={"mlflow.runType": "training", "mlflow.runSourceType": "training"},
+            ) as run:
+                write_json(directory / "mlflow_run.json", {
+                    "run_id": run.info.run_id, "tracking_uri": tracking_uri,
+                    "experiment_id": run.info.experiment_id, "experiment_name": experiment.name,
+                })
+                print(f"MLflow: method={method}, run_id={run.info.run_id}, "
+                      f"experiment_id={run.info.experiment_id}", flush=True)
                 mlflow.log_params({"method": method, "encoder": args.encoder, "normalize_embeddings": True,
                                    **config[method]})
                 mlflow.log_metrics(training_metrics)

@@ -1,107 +1,109 @@
-# Supply Chain MLOps - Client reviews unsupervised clustering 
+# Supply Chain MLOps — local clustering experiments
 
-This project stems from a collective work produced in the context of Liora Machine Learning engineering formation. The current version of it has been reframed entirely for learning purposes.
-This work has been both an organizational and technical challenge. Both aspects are documented in the present README file.
+This branch, `rebuild_step2_scripting`, rebuilds review clustering with Python,
+DVC, and MLflow. `main` and `feat/grafana` contain historical implementations.
+The current scope is local training, evaluation, and model selection using
+KMeans and Spherical KMeans. Git and DVC remotes are preserved as configured.
 
-## Technicalities
-
-The main purpose was to implement the complete MLops chain from project design up to production and monitoring of the application and models. The starting point was 40 000 scrapped Trustpilot reviews.
-We aimed at implementing a clustering tool enabling automatic reviews clustering coupled with sentiment analysis. This reframed version of the project is focused on unsupervised semantic clustering only.
-The main point is to display the stability and structure of the whole MLops chain. 
-
-### Rebuild step 1: Exploratory phase
-
-Four pipelines were explored during this exploratory phase. Using SentenceTransformers paraphrase-multilingual-mpnet-base-v2 to generate embeddings (with L2 normalization):
-* KMeans
-* Spherical KMeans
-* HDBSCAN
-* UMAP dimensional reduction followed by HDBSCAN
-
-All pipelines were tracked using MLflow. Geometric, semantic, statistical and algorithmic coherence and stability have been investigated.
-
-### Suivi MLflow hébergé sur DagsHub
-
-DagsHub fournit le serveur MLflow du dépôt : aucun serveur local à démarrer.
-Les scripts d'entraînement prennent en charge KMeans et Spherical KMeans.
-L'intégration utilise directement le client MLflow, sans nécessiter le SDK DagsHub.
-
-Copier `.env.example` vers `.env`, puis renseigner son nom d'utilisateur DagsHub
-et son jeton d'accès personnel (avec accès en écriture au dépôt). Le propriétaire
-du dépôt peut être différent de l'utilisateur authentifié. Le fichier `.env`
-est ignoré par Git ; les scripts lisent les variables d'environnement, sans
-charger automatiquement ce fichier.
+## Run locally
 
 ```bash
-cp .env.example .env
-# Modifier .env avant de poursuivre, puis exporter ses variables :
-set -a
-source .env
-set +a
-
-uv run python src/train.py \
-  --input data/processed/reviews.csv \
-  --output-dir models/run-001 \
-  --experiment Supply-chain-baseline
-
-uv run python src/evaluate.py \
-  --artifact-dir models/run-001 \
-  --output-dir reports/run-001 \
-  --log-mlflow
-```
-
-Adapter le chemin du CSV (colonne `commentaire` par défaut). Utiliser de nouveaux
-répertoires de sortie à chaque exécution. L'entraînement envoie paramètres,
-métriques, modèles de clustering et encodeur à DagsHub. L'évaluation ajoute ses
-résultats aux mêmes runs grâce aux fichiers locaux `mlflow_run.json`.
-Les identifiants restent dans l'environnement et ne sont pas enregistrés dans
-ces fichiers. `DAGSHUB_USER_TOKEN` ou `DAGSHUB_CLIENT_TOKEN` peuvent aussi fournir
-le jeton si `MLFLOW_TRACKING_PASSWORD` n'est pas défini.
-
-Pour choisir un autre dépôt, utiliser `--dagshub-repo OWNER/REPOSITORY` lors de
-l'entraînement ; ce paramètre remplace l'URL de l'environnement. L'option
-`--tracking-uri URL` permet également de choisir explicitement un serveur MLflow.
-Sans ces options et sans `MLFLOW_TRACKING_URI`, l'entraînement reste local, sans
-suivi MLflow. La prédiction utilise les artefacts locaux de l'entraînement et
-ne nécessite aucune connexion à DagsHub.
-
-Interface du dépôt : [MLflow sur DagsHub](https://dagshub.com/schmilblick-ai/Supply-Chain-MLOps.mlflow).
-Configuration : [documentation officielle DagsHub](https://dagshub.com/docs/integration_guide/mlflow_tracking/).
-
-### Pipeline DVC : entraînement → évaluation
-
-`dvc.yaml` enchaîne `train` puis `evaluate` pour les deux méthodes. Les paramètres
-sont dans `params.yaml`. L'entrée par défaut est `data/raw/avis_24k_train.csv`,
-utilisée dans le notebook d'expérimentation ; adapter `data.input` si nécessaire.
-
-```bash
-uv sync
+uv sync --frozen
 source .venv/bin/activate
+# If the input data is missing, retrieve it from the existing configured remote:
 dvc pull data/raw.dvc
 dvc repro
 dvc metrics show
+mlflow ui --backend-store-uri sqlite:///mlflow.db
 ```
 
-Les modèles et l'encodeur sont produits dans `models/clustering`, les rapports
-dans `reports/clustering`, et les métriques comparables avec DVC dans
-`metrics/clustering.json`. DVC gère les sorties et les remplace lorsqu'une étape
-doit être recalculée. Une modification des paramètres d'évaluation relance
-uniquement cette étape ; une modification de l'entraînement relance les deux.
-Ne pas utiliser ces répertoires pour des fichiers créés manuellement.
+Set the CSV path and text column in `params.yaml`. The default input is
+`data/raw/avis_24k_train.csv`, with a `commentaire` column. Blank reviews are
+rejected rather than silently dropped. Data access uses the existing DVC
+configuration and any credentials you supply separately.
 
-Pour enregistrer aussi les résultats sur DagsHub, exporter les variables du
-fichier `.env` comme décrit ci-dessus et définir `evaluate.extra_args` à
-`"--log-mlflow"` avant `dvc repro`. Les variables d'environnement ne sont pas
-suivies par DVC : après un changement de serveur ou l'activation du suivi,
-utiliser `dvc repro --force` pour exécuter à nouveau les étapes. Les étapes
-restaurées depuis le cache ne renvoient pas leurs artefacts à MLflow.
+## Pipeline
 
-Les mots-clés sont extraits par défaut. `evaluate.extra_args` accepte aussi
-`--skip-keywords` ou `--stability statistical algorithmic global --plot`.
-`train.extra_args` permet notamment de fixer la révision de l'encodeur avec
-`--revision <commit>` pour stabiliser les téléchargements ultérieurs.
+1. `train`: encode reviews once with the pretrained multilingual encoder,
+   normalize embeddings, and fit both clustering methods. Save the encoder,
+   estimators, assignments, configuration, package versions, and input hash in
+   `models/clustering`. Log parameters, metrics, and artifacts to local MLflow.
+2. `evaluate`: compute cosine silhouette and Davies–Bouldin scores, cluster
+   sizes, French c-TF-IDF keywords, and optional stability analyses. Save reports
+   in `reports/clustering`, consolidate DVC metrics in `metrics/clustering.json`,
+   and append evaluation results to the original MLflow runs.
+3. `select`: rank the evaluated models using the declared metric and direction.
+   Write `reports/selection.json` with the chosen method, ranking, artifact
+   paths, and hashes of the model, metrics, training metadata, and training data.
+   This records an experiment decision; it does not deploy a model.
 
-Après une exécution réelle réussie, versionner `dvc.yaml`, `params.yaml`,
-`dvc.lock` et `metrics/clustering.json` dans Git ; `dvc push` envoie les sorties
-en cache au stockage DVC configuré. `dvc.lock` est généré par DVC à l'exécution.
-Voir la [documentation des pipelines DVC](https://doc.dvc.org/user-guide/pipelines/defining-pipelines).
- 
+The default selection maximizes cosine silhouette on training embeddings.
+This is an internal geometry comparison, not evidence of generalization or
+semantic quality. Undefined scores are excluded; selection fails if no valid
+score exists. Equal scores are resolved alphabetically by method name.
+Use `selection.metric: davies_bouldin` with `selection.direction: minimize`
+when selecting by Davies–Bouldin instead.
+
+## Reproducibility and experiments
+
+`params.yaml` controls cluster count, initialization count, iteration limit,
+random seeds, encoder, evaluation sampling, selection rule, and tracking URI.
+The DVC command explicitly sets `train.tracking_uri` to `sqlite:///mlflow.db`
+by default, so an inherited remote tracking environment does not redirect it.
+
+```bash
+dvc exp run -S train.n_clusters=15
+dvc exp show
+dvc metrics diff
+```
+
+For stronger encoder reproducibility, set `train.extra_args` to
+`"--revision <encoder-commit>"` using a revision you have verified. An unpinned
+encoder identifier may resolve to different weights over time. Fixed seeds
+make clustering and metric sampling repeatable within the same environment;
+results may vary across numerical libraries or hardware. `uv.lock` is a DVC
+stage dependency, and the commands above use its locked environment.
+
+Modify evaluation parameters to rerun evaluation and selection; modify training
+parameters to rerun the full pipeline. For optional stability checks, append
+`--stability statistical algorithmic global --plot` to `evaluate.extra_args`.
+Keep `--log-mlflow` there to log evaluation; append `--skip-keywords` to skip
+keyword extraction. Additional JSON hyperparameter overrides are supported by
+`train.py --config`; if used in DVC, declare that JSON file as a stage dependency.
+
+DVC removes managed outputs before recomputation. Do not place unrelated files
+in the stage output directories. Standalone scripts deliberately reject existing
+output paths. Commit `dvc.yaml`, `params.yaml`, the generated `dvc.lock`, and
+`metrics/clustering.json` after a real run. `dvc push` sends cached outputs to
+the already configured remote; it does not upload the local MLflow database.
+
+DVC cache restoration does not replay MLflow logging. Preserve `mlflow.db` and
+`mlartifacts/` together to retain local runs. To regenerate runs after removing
+that store, use `dvc repro --force --no-run-cache`. The tracking database and
+MLflow artifacts are local and ignored by Git.
+
+## Standalone scripts and optional remote tracking
+
+Run `python src/train.py --help`, `python src/evaluate.py --help`,
+`python src/select_model.py --help`, or `python src/predict.py --help` for options.
+Prediction uses the saved local encoder and clustering bundle without refitting.
+
+Standalone training accepts `--tracking-uri` or `MLFLOW_TRACKING_URI`. For a
+remote service, supply its exact URI and credentials yourself; no owner, URL,
+or credential is derived from legacy configuration. `.env.example` contains
+empty optional environment settings. The scripts do not load `.env`
+automatically. For DVC, set the explicit URI in `train.tracking_uri` and export
+credentials in your shell. Never commit credentials. URI credentials are
+rejected by the tracking helper. Changing tracking configuration requires a
+fresh run to produce new MLflow run references.
+
+## Offline checks
+
+```bash
+MLFLOW_DISABLE_AGENT_HINT=1 python -m unittest discover -s tests -v
+```
+
+The integration test uses synthetic encoder output with real clustering,
+serialization, evaluation, model selection, and a temporary local MLflow store.
+It requires no model download or remote service. It does not validate semantic
+quality or the full pretrained encoder run.
