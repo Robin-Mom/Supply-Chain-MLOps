@@ -14,10 +14,6 @@ encoders:
     id: sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2
     revision: e8f8c211226b894fcb81acc59f3b34ba3efd5f42
     max_seq_length: 128
-  bge_m3:
-    id: BAAI/bge-m3
-    revision: 5617a9f61b028005a4858fdac845db406aefb181
-    max_seq_length: 512
 embedding:
   batch_size: 16
   device: cpu

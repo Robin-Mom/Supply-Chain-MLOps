@@ -48,8 +48,8 @@ def load_params(path="params.yaml"):
         raise ValueError("Exactly five distinct seeds are required.")
     if params["selection"]["final_seed"] not in seeds:
         raise ValueError("The predetermined final seed must belong to the exploration.")
-    if set(params["exploration"]["methods"]) != {"kmeans", "spherical_kmeans"} or len(params["encoders"]) != 3:
-        raise ValueError("Expected three encoders and both supported clustering methods.")
+    if set(params["exploration"]["methods"]) != {"kmeans", "spherical_kmeans"} or len(params["encoders"]) != 2:
+        raise ValueError("Expected two encoders and both supported clustering methods.")
     for alias, encoder in params["encoders"].items():
         if not re.fullmatch(r"[a-zA-Z0-9_-]+", alias):
             raise ValueError("Encoder aliases must be safe path components.")
