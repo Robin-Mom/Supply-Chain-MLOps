@@ -1,3 +1,6 @@
+# Tracking stages load tracking.env_file at runtime. Its contents must never be
+# declared as DVC dependencies/outputs or copied into isolated workspaces.
+# run_experiments.py loads it before spawning DVC and passes the environment.
 stages:
   embed:
     foreach: ${encoders}

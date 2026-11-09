@@ -105,6 +105,8 @@ class ExperimentPredictor:
         """
         import mlflow
         from experiment import read_json
+        from tracking import configure_tracking
+        configure_tracking(mlflow.get_tracking_uri())
         destination = Path(destination)
         destination.mkdir(parents=True, exist_ok=True)
         local_manifest = mlflow.artifacts.download_artifacts(artifact_uri=manifest_uri, dst_path=str(destination))
