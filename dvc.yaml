@@ -1,75 +1,94 @@
 stages:
+  embed:
+    foreach: ${encoders}
+    do:
+      cmd: python src/embed.py --params params.yaml --encoder ${key}
+      deps:
+        - data/train_eval/train_20k.csv
+        - data/train_eval/eval_4k.csv
+        - src/embed.py
+        - src/experiment.py
+        - pyproject.toml
+        - uv.lock
+      params:
+        - data
+        - encoders.${key}
+        - embedding
+      outs:
+        - models/embeddings/${key}
+
   train:
-    cmd: >-
-      python src/train.py
-      --input "${data.input}"
-      --output-dir models/clustering
-      --text-column "${data.text_column}"
-      --methods kmeans spherical_kmeans
-      --encoder "${train.encoder}"
-      --batch-size ${train.batch_size}
-      --n-clusters ${train.n_clusters}
-      --n-init ${train.n_init}
-      --max-iter ${train.max_iter}
-      --seed ${train.seed}
-      --tracking-uri "${train.tracking_uri}"
-      --experiment "${train.experiment}"
-      ${train.extra_args}
+    cmd: python src/train.py --params params.yaml
     deps:
-      - ${data.input}
+      - models/embeddings/${experiment.encoder}/train.npy
+      - models/embeddings/${experiment.encoder}/train.json
+      - data/train_eval/train_20k.csv
       - src/train.py
+      # Evaluation data enters the sweep identity, never estimator.fit().
+      - data/train_eval/eval_4k.csv
+      - src/embed.py
+      - src/predict.py
+      - src/evaluate.py
+      - src/experiment.py
       - src/tracking.py
       - pyproject.toml
       - uv.lock
     params:
       - data
-      - train
+      - encoders
+      - clustering
+      - exploration
+      - experiment
+      - evaluation
+      - selection
+      - tracking
     outs:
-      - models/clustering
+      - models/runs/${experiment.encoder}/${experiment.method}/${experiment.seed}
+
+  predict:
+    cmd: python src/predict.py --params params.yaml
+    deps:
+      - models/runs/${experiment.encoder}/${experiment.method}/${experiment.seed}
+      - models/embeddings/${experiment.encoder}/eval.npy
+      - models/embeddings/${experiment.encoder}/eval.json
+      - data/train_eval/eval_4k.csv
+      - src/predict.py
+      - src/train.py
+      - src/experiment.py
+      - pyproject.toml
+      - uv.lock
+    params:
+      - data
+      - encoders.${experiment.encoder}
+      - clustering
+      - experiment
+    outs:
+      - models/predictions/${experiment.encoder}/${experiment.method}/${experiment.seed}
 
   evaluate:
-    cmd: >-
-      python src/evaluate.py
-      --artifact-dir models/clustering
-      --output-dir reports/clustering
-      --metrics-output metrics/clustering.json
-      --silhouette-sample-size ${evaluate.silhouette_sample_size}
-      --seed ${evaluate.seed}
-      --n-repeats ${evaluate.n_repeats}
-      --sample-fraction ${evaluate.sample_fraction}
-      ${evaluate.extra_args}
+    cmd: python src/evaluate.py --params params.yaml
     deps:
-      - models/clustering
+      - models/runs/${experiment.encoder}/${experiment.method}/${experiment.seed}
+      - models/predictions/${experiment.encoder}/${experiment.method}/${experiment.seed}
+      - models/embeddings/${experiment.encoder}/eval.npy
+      - models/embeddings/${experiment.encoder}/eval.json
+      - data/train_eval/eval_4k.csv
       - src/evaluate.py
       - src/train.py
+      - src/experiment.py
       - src/tracking.py
       - pyproject.toml
       - uv.lock
     params:
-      - evaluate
-    outs:
-      - reports/clustering
-    metrics:
-      - metrics/clustering.json:
-          cache: false
-
-  select:
-    cmd: >-
-      python src/select_model.py
-      --metrics metrics/clustering.json
-      --artifact-dir models/clustering
-      --output reports/selection.json
-      --metric ${selection.metric}
-      --direction ${selection.direction}
-    deps:
-      - metrics/clustering.json
-      - models/clustering
-      - src/select_model.py
-      - src/train.py
-      - src/tracking.py
-      - pyproject.toml
-      - uv.lock
-    params:
+      - data
+      - encoders.${experiment.encoder}
+      - clustering
+      - experiment
+      - evaluation
       - selection
+      - exploration
+      - tracking
     outs:
-      - reports/selection.json
+      - models/evaluations/${experiment.encoder}/${experiment.method}/${experiment.seed}/result.json
+    metrics:
+      - models/evaluations/${experiment.encoder}/${experiment.method}/${experiment.seed}/metrics.json
