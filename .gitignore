@@ -28,6 +28,7 @@ models/*
 .env
 .streamlit/secrets.toml
 .env.*
+.env.dagshub.local
 !.env.example
 
 

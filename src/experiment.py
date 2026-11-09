@@ -48,7 +48,8 @@ def load_params(path="params.yaml"):
         raise ValueError("Exactly five distinct seeds are required.")
     if params["selection"]["final_seed"] not in seeds:
         raise ValueError("The predetermined final seed must belong to the exploration.")
-    if set(params["exploration"]["methods"]) != {"kmeans", "spherical_kmeans"} or len(params["encoders"]) != 2:
+    if (set(params["exploration"]["methods"]) != {"kmeans", "spherical_kmeans"}
+            or len(params["exploration"]["methods"]) != 2 or len(params["encoders"]) != 2):
         raise ValueError("Expected two encoders and both supported clustering methods.")
     for alias, encoder in params["encoders"].items():
         if not re.fullmatch(r"[a-zA-Z0-9_-]+", alias):
@@ -155,13 +156,16 @@ def provenance():
 
 def tracking(params):
     """Use an explicit stable store across DVC temporary workspaces."""
-    from tracking import configure_tracking
-    uri = os.environ.get("SUPPLY_CHAIN_TRACKING_URI") or params["tracking"]["uri"]
+    from tracking import configure_tracking, load_tracking_environment
+    env_file = params["tracking"].get("env_file")
+    load_tracking_environment(env_file)
+    uri = (os.environ.get("SUPPLY_CHAIN_TRACKING_URI") or params["tracking"]["uri"]
+           or os.environ.get("MLFLOW_TRACKING_URI"))
     if uri.startswith("sqlite:///") and not uri.startswith("sqlite:////"):
         raise ValueError("Set SUPPLY_CHAIN_TRACKING_URI to an absolute sqlite URI before running DVC experiments.")
     if not uri:
-        raise ValueError("MLflow tracking is mandatory for this pipeline.")
-    return configure_tracking(uri)
+        raise ValueError("Set MLFLOW_TRACKING_URI in .env.dagshub.local or export a tracking URI.")
+    return configure_tracking(uri, env_file=env_file)
 
 
 def start_run(params, kind, logical_id, extra_tags=None):

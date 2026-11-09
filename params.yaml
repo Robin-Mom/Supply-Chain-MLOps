@@ -36,6 +36,9 @@ experiment:
   method: kmeans
   seed: 42
 tracking:
+  # Local only: credentials are loaded into the environment, never DVC outputs.
+  env_file: .env.dagshub.local
+  # Optional explicit override. Otherwise use the URI from the local env file.
   uri: ''
   train_experiment: Supply_chain_train
   eval_experiment: Supply_chain_eval

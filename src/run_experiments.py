@@ -1,4 +1,4 @@
-"""Sequential DVC experiment sweep; global selection only after all 30 runs."""
+"""Sequential 2-encoder / 2-method / 5-seed sweep, followed by selection."""
 from __future__ import annotations
 
 import argparse
