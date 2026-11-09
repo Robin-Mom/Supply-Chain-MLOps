@@ -1,27 +1,51 @@
 data:
-  input: data/processed/avis_24k_train.csv
+  train: data/train_eval/train_20k.csv
+  eval: data/train_eval/eval_4k.csv
+  train_rows: 20000
+  eval_rows: 4000
   text_column: commentaire
-
-train:
-  encoder: sentence-transformers/paraphrase-multilingual-mpnet-base-v2
-  batch_size: 32
+  id_column: 'Unnamed: 0'
+encoders:
+  mpnet:
+    id: sentence-transformers/paraphrase-multilingual-mpnet-base-v2
+    revision: 4328cf26390c98c5e3c738b4460a05b95f4911f5
+    max_seq_length: 128
+  minilm:
+    id: sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2
+    revision: e8f8c211226b894fcb81acc59f3b34ba3efd5f42
+    max_seq_length: 128
+  bge_m3:
+    id: BAAI/bge-m3
+    revision: 5617a9f61b028005a4858fdac845db406aefb181
+    max_seq_length: 512
+embedding:
+  batch_size: 16
+  device: cpu
+clustering:
   n_clusters: 10
   n_init: 10
   max_iter: 300
+exploration:
+  methods:
+  - kmeans
+  - spherical_kmeans
+  seeds:
+  - 42
+  - 43
+  - 44
+  - 45
+  - 46
+experiment:
+  encoder: mpnet
+  method: kmeans
   seed: 42
-  tracking_uri: sqlite:///mlflow.db
-  experiment: Supply-chain_model-selection_Test
-  # Optional CLI flags, e.g. --revision <encoder-commit> --device cpu
-  extra_args: ""
-
-evaluate:
-  silhouette_sample_size: 5000
-  seed: 42
-  n_repeats: 10
-  sample_fraction: 0.8
-  # Stability example: --stability statistical algorithmic global --plot
-  extra_args: "--log-mlflow"
-
+tracking:
+  uri: ''
+  train_experiment: Supply_chain_train
+  eval_experiment: Supply_chain_eval
+evaluation:
+  sample_size: 0
+  sample_seed: 42
+  working_memory_mb: 32
 selection:
-  metric: silhouette_cosine
-  direction: maximize
+  final_seed: 42

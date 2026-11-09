@@ -29,11 +29,13 @@ DEFAULT_ENCODER = "sentence-transformers/paraphrase-multilingual-mpnet-base-v2"
 
 def validate_embeddings(X):
     """Validate a dense embedding matrix and normalize each row."""
-    X = np.asarray(X, dtype=np.float64)
+    X = np.asarray(X, dtype=np.float32)
     if X.ndim != 2 or not len(X) or not X.shape[1]:
         raise ValueError("Expected a non-empty two-dimensional embedding matrix.")
     if not np.isfinite(X).all() or np.any(np.linalg.norm(X, axis=1) == 0):
         raise ValueError("Embeddings must be finite and have nonzero row norms.")
+    if np.allclose(np.linalg.norm(X, axis=1), 1, atol=1e-5):
+        return X
     return normalize(X)
 
 
@@ -152,6 +154,13 @@ def fit_clustering(X, method, config, seed=None):
 
 def main(argv=None):
     """Encode reviews once, train selected methods and save reusable bundles."""
+    import sys
+    arguments = list(sys.argv[1:] if argv is None else argv)
+    if "--params" in arguments:
+        from experiment import load_params
+        parser = argparse.ArgumentParser()
+        parser.add_argument("--params", required=True)
+        return train_experiment(load_params(parser.parse_args(arguments).params))
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--input", type=Path, required=True)
     parser.add_argument("--output-dir", type=Path, required=True)
@@ -257,6 +266,48 @@ def main(argv=None):
                 mlflow.log_artifact(__file__, artifact_path="source")
                 mlflow.log_artifact(str(Path(__file__).with_name("tracking.py")), artifact_path="source")
         print(f"Saved {directory}", flush=True)
+
+
+def train_experiment(params):
+    """Fit exactly one train-only configuration; log no transformer weights."""
+    import gc
+    import mlflow
+    from experiment import (configuration, digest, file_hash, load_embeddings,
+                            provenance, run_dir, start_run, write_json)
+    config = configuration(params)
+    alias, method = config["encoder_alias"], config["method"]
+    X, cache = load_embeddings(params, alias, "train")
+    logical_id = digest(config)
+    directory = run_dir(params)
+    directory.mkdir(parents=True, exist_ok=False)
+    start = perf_counter()
+    model, _, _, _ = fit_clustering(X, method, {method: config["hyperparameters"]})
+    metrics = {"fit_seconds": perf_counter() - start, "inertia": float(model.inertia_)}
+    # Training labels are not needed by held-out inference or evaluation.
+    if hasattr(model, "labels_"):
+        del model.labels_
+    model_path = directory / "model.joblib"
+    joblib.dump({"method": method, "model": model, "n_features": X.shape[1],
+                 "logical_id": logical_id, "encoder": config["encoder"],
+                 "preprocessing": config["preprocessing"]}, model_path)
+    with start_run(params, "train", logical_id) as run:
+        manifest = {"schema_version": 1, "logical_id": logical_id, "configuration": config,
+                    "train_embedding": {"cache_id": cache["cache_id"], "sha256": cache["sha256"]},
+                    "model_path": str(model_path), "model_sha256": file_hash(model_path),
+                    "n_features": X.shape[1], "transformations": [], "provenance": provenance(),
+                    "mlflow_run_id": run.info.run_id, "mlflow_experiment_id": run.info.experiment_id,
+                    "tracking_uri": mlflow.get_tracking_uri(), "model_uri": f"runs:/{run.info.run_id}/clustering/model.joblib"}
+        write_json(directory / "manifest.json", manifest)
+        write_json(directory / "training_metrics.json", metrics)
+        mlflow.log_params({"encoder": config["encoder"]["id"], "revision": config["encoder"]["revision"],
+                           "method": method, **config["hyperparameters"]})
+        mlflow.set_tags({"dvc_experiment_name": manifest["provenance"]["dvc_experiment_name"] or "standalone",
+                         "train_cache_id": cache["cache_id"]})
+        mlflow.log_metrics(metrics)
+        mlflow.log_artifacts(str(directory), artifact_path="clustering")
+    del model, X
+    gc.collect()
+    return manifest
 
 
 if __name__ == "__main__":

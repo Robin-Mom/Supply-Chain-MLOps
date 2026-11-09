@@ -135,6 +135,13 @@ def evaluate_stability(X, method, config, mode="statistical", n_repeats=10,
 
 def main(argv=None):
     """Write metric JSON, keyword CSV and optional stability CSV/boxplots."""
+    import sys
+    arguments = list(sys.argv[1:] if argv is None else argv)
+    if "--params" in arguments:
+        from experiment import load_params
+        parser = argparse.ArgumentParser()
+        parser.add_argument("--params", required=True)
+        return evaluate_experiment(load_params(parser.parse_args(arguments).params))
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--artifact-dir", type=Path, required=True)
     parser.add_argument("--output-dir", type=Path, required=True)
@@ -244,6 +251,75 @@ def main(argv=None):
     if args.metrics_output:
         args.metrics_output.parent.mkdir(parents=True, exist_ok=True)
         write_json(args.metrics_output, combined_metrics)
+
+
+def held_out_silhouette(X, labels, config):
+    """Use the same deterministic positions for every configuration, in chunks."""
+    from sklearn import config_context
+    count = config["sample_size"]
+    indices = np.arange(len(X))
+    if count and count < len(X):
+        indices = np.sort(np.random.default_rng(config["sample_seed"]).choice(len(X), count, replace=False))
+    y = np.asarray(labels)[indices]
+    from experiment import digest
+    result = {"silhouette_cosine": None, "silhouette_n_samples": len(indices),
+              "sample_indices_sha256": digest(indices.tolist()), "undefined_reason": None}
+    if not 2 <= len(np.unique(y)) < len(y):
+        result["undefined_reason"] = "Silhouette requires 2 through n_samples-1 represented clusters."
+        return result
+    with config_context(working_memory=config["working_memory_mb"]):
+        result["silhouette_cosine"] = float(silhouette_score(X[indices], y, metric="cosine"))
+    return result
+
+
+def evaluate_experiment(params):
+    import mlflow
+    from experiment import (checked_manifest, digest, evaluation_dir, file_hash, load_embeddings,
+                            prediction_dir, read_json, start_run, sweep_id, write_json)
+    manifest = checked_manifest(params)
+    predicted = read_json(prediction_dir(params) / "manifest.json")
+    X, cache = load_embeddings(params, params["experiment"]["encoder"], "eval")
+    if (predicted["logical_id"] != manifest["logical_id"]
+            or predicted["train_mlflow_run_id"] != manifest["mlflow_run_id"]
+            or predicted["eval_cache_id"] != cache["cache_id"]
+            or predicted["eval_embedding_sha256"] != cache["sha256"]
+            or file_hash(predicted["predictions_path"]) != predicted["predictions_sha256"]):
+        raise ValueError("Prediction provenance mismatch.")
+    frame = pd.read_csv(predicted["predictions_path"], dtype={"observation_id": str})
+    if (frame.observation_id.tolist() != cache["observation_ids"]
+            or not frame.logical_id.eq(manifest["logical_id"]).all()):
+        raise ValueError("Prediction observation alignment mismatch.")
+    labels = frame.cluster_id.to_numpy()
+    if not np.issubdtype(labels.dtype, np.integer) or (labels < 0).any():
+        raise ValueError("Invalid cluster assignments.")
+    metrics = held_out_silhouette(X, labels, params["evaluation"])
+    directory = evaluation_dir(params)
+    # DVC creates output parents before executing the stage.
+    if (directory / "result.json").exists() or (directory / "metrics.json").exists():
+        raise FileExistsError("Evaluation outputs already exist; let DVC manage reproduction.")
+    directory.mkdir(parents=True, exist_ok=True)
+    with start_run(params, "eval", manifest["logical_id"], {
+            "train_mlflow_run_id": manifest["mlflow_run_id"],
+            "dvc_experiment_name": manifest["provenance"]["dvc_experiment_name"] or "standalone"}) as run:
+        result = {"logical_id": manifest["logical_id"], "sweep_id": sweep_id(params),
+                  "configuration": manifest["configuration"], "metrics": metrics,
+                  "evaluation_config": params["evaluation"], "eval_input_sha256": cache["spec"]["input_sha256"],
+                  "observation_ids_sha256": digest(cache["observation_ids"]),
+                  "train_mlflow_run_id": manifest["mlflow_run_id"], "eval_mlflow_run_id": run.info.run_id,
+                  "train_manifest": manifest, "prediction": predicted,
+                  "predictions_uri": f"runs:/{run.info.run_id}/evaluation/assignments.csv"}
+        write_json(directory / "result.json", result)
+        write_json(directory / "metrics.json", {k: v for k, v in metrics.items() if isinstance(v, (int, float)) or v is None})
+        mlflow.log_params({"train_mlflow_run_id": manifest["mlflow_run_id"],
+                           "encoder": manifest["configuration"]["encoder"]["id"],
+                           "method": manifest["configuration"]["method"],
+                           "seed": manifest["configuration"]["hyperparameters"]["random_state"],
+                           **params["evaluation"]})
+        mlflow.log_metrics({k: v for k, v in metrics.items() if isinstance(v, (int, float))})
+        mlflow.set_tag("silhouette_defined", str(metrics["silhouette_cosine"] is not None).lower())
+        mlflow.log_artifact(str(directory / "result.json"), artifact_path="evaluation")
+        mlflow.log_artifact(predicted["predictions_path"], artifact_path="evaluation")
+    return result
 
 
 if __name__ == "__main__":
