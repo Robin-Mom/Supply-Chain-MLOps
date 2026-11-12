@@ -115,6 +115,20 @@ def select(params, output):
     with tempfile.TemporaryDirectory() as directory:
         results = collect_results(params, client, Path(directory))
     rows, pairs = aggregate_results(results)
+    # ARI needs the complete sweep: compare each seed with its four peers.
+    # Update existing runs without reopening them or changing their status.
+    for item in results:
+        config = item["configuration"]
+        seed = config["hyperparameters"]["random_state"]
+        aris = [pair["ari"] for pair in pairs
+                if pair["encoder"] == config["encoder_alias"]
+                and pair["method"] == config["method"]
+                and seed in (pair["seed_a"], pair["seed_b"])]
+        for run_id in (item["train_mlflow_run_id"], item["eval_mlflow_run_id"]):
+            client.log_metric(run_id, "ari_mean", float(np.mean(aris)))
+            client.log_metric(run_id, "ari_std", float(np.std(aris, ddof=1)))
+            client.log_metric(run_id, "ari_pairs", len(aris))
+            client.set_tag(run_id, "ari_definition", "held-out stability against other seeds of the same encoder/method")
     ranking = sorted([row for row in rows if row["eligible"]],
                      key=lambda row: (-row["silhouette_mean"], -row["ari_mean"], row["encoder"], row["method"]))
     if not ranking:
