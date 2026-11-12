@@ -171,6 +171,20 @@ séquentiellement `train`, `predict`, puis `evaluate` avec `--single-item --forc
 
 ## Évaluation et sélection
 
+Pour comparer les runs dans DagsHub, afficher les colonnes MLflow
+`silhouette_cosine` (à maximiser), `ari_mean` (à maximiser) et `inertia`
+(à minimiser au sein d'une même méthode et d'un même espace d'embeddings).
+La silhouette et l'inertie sont disponibles dans les expériences d'entraînement
+et d'évaluation après `evaluate`. L'inertie est l'objectif sur les données
+d'entraînement : somme des distances euclidiennes au carré pour KMeans,
+somme des distances cosine pour Spherical KMeans ; leurs valeurs ne sont donc
+pas directement comparables entre méthodes.
+Après le sweep complet, la sélection ajoute à chaque run `ari_mean`, moyenne
+des ARI de sa partition eval avec les quatre autres seeds du même encodeur et
+de la même méthode, ainsi que `ari_std` et `ari_pairs` (4). Cet ARI mesure la
+stabilité, sans labels de référence. Les anciens runs ne sont pas mis à jour
+automatiquement : ces métriques concernent les nouvelles exécutions du pipeline.
+
 La silhouette est exacte sur les 4 000 avis par défaut (`sample_size: 0`).
 Scikit-learn calcule les distances par blocs, avec `working_memory_mb: 32` pour
 limiter leur mémoire de travail. Une seule configuration est évaluée à la fois.

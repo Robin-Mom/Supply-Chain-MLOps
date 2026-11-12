@@ -275,7 +275,7 @@ def held_out_silhouette(X, labels, config):
 def evaluate_experiment(params):
     import mlflow
     from experiment import (checked_manifest, digest, evaluation_dir, file_hash, load_embeddings,
-                            prediction_dir, read_json, start_run, sweep_id, write_json)
+                            prediction_dir, read_json, run_dir, start_run, sweep_id, write_json)
     manifest = checked_manifest(params)
     predicted = read_json(prediction_dir(params) / "manifest.json")
     X, cache = load_embeddings(params, params["experiment"]["encoder"], "eval")
@@ -293,6 +293,8 @@ def evaluate_experiment(params):
     if not np.issubdtype(labels.dtype, np.integer) or (labels < 0).any():
         raise ValueError("Invalid cluster assignments.")
     metrics = held_out_silhouette(X, labels, params["evaluation"])
+    # Keep the training objective beside held-out quality in the comparison UI.
+    metrics["inertia"] = read_json(run_dir(params) / "training_metrics.json")["inertia"]
     directory = evaluation_dir(params)
     # DVC creates output parents before executing the stage.
     if (directory / "result.json").exists() or (directory / "metrics.json").exists():
@@ -316,6 +318,10 @@ def evaluate_experiment(params):
                            "seed": manifest["configuration"]["hyperparameters"]["random_state"],
                            **params["evaluation"]})
         mlflow.log_metrics({k: v for k, v in metrics.items() if isinstance(v, (int, float))})
+        client = mlflow.MlflowClient()
+        for key, value in metrics.items():
+            if isinstance(value, (int, float)):
+                client.log_metric(manifest["mlflow_run_id"], key, value)
         mlflow.set_tag("silhouette_defined", str(metrics["silhouette_cosine"] is not None).lower())
         mlflow.log_artifact(str(directory / "result.json"), artifact_path="evaluation")
         mlflow.log_artifact(predicted["predictions_path"], artifact_path="evaluation")
