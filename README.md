@@ -943,3 +943,164 @@ Un test exécute deux seeds DVC dans des workspaces isolés, puis
 restaure une expérience sous un nouveau nom. Il vérifie que l'encodeur n'est
 chargé qu'une fois et que les références MLflow restent correctes. Aucun poids n'est
 téléchargé ; ces tests ne mesurent pas la qualité sémantique des modèles réels.
+
+## Phase 6D — Offline statistical monitoring
+
+`src/monitor_drift.py` reads the reference and production CSVs directly for input
+monitoring. It reads the simulator's `run.json` and `requests/batch-*.json` for
+production cluster assignments. It does not contact the API, fit a model, change
+infrastructure, or run the simulator. The independent final test set is excluded.
+Only stripped text character length and whitespace-delimited word count enter
+Evidently; review content, author names and ratings are never exported.
+
+Install the locked environment with `uv sync --frozen`. Evidently is pinned to
+**0.7.23**. This uses the current `Report`, `Dataset.from_pandas`, `DataDefinition`
+and `ValueDrift` API; `Report.run()` returns a `Snapshot` saved with `save_html()`
+and `save_json()`. See the [official report API](https://evidentlyai.github.io/evidently/api-reference/main/evidently/core/report.html)
+and [drift configuration](https://docs.evidentlyai.com/metrics/customize_data_drift).
+
+Input monitoring works before any simulator outputs are available:
+
+```bash
+uv run python src/monitor_drift.py report \
+  --reference data/processed/avis_4k_reference.csv \
+  --production data/processed/avis_8k_production.csv \
+  --output reports/drift_monitoring/input-only-001
+```
+
+CSV defaults are `--text-column commentaire --id-column ''` (the existing
+unnamed original row ID). IDs must be nonblank, unique within each dataset and
+stable across CSV/prediction files. Reference and production IDs must be disjoint.
+Rows are never silently dropped, deduplicated or truncated. Text must meet the
+simulator's nonblank/5,000-character contract. Both CSVs are fingerprinted with
+SHA-256; a change while reading/analysing invalidates the run.
+
+### Reference predictions and model identity
+
+Generate reference assignments explicitly, once, with the selected frozen model:
+
+```bash
+uv run python src/monitor_drift.py predict-reference \
+  --selection config/selection.docker.json \
+  --reference data/processed/avis_4k_reference.csv \
+  --batch-size 32 \
+  --output reports/drift_monitoring/reference-predictions.json
+```
+
+This reuses the existing verified MLflow inference loader, checks the manifest,
+model SHA-256, logical ID, complete configuration and estimator parameters, then
+runs CPU inference with the exact selected encoder revision and preprocessing.
+No estimator or dimensionality reduction is fitted. The model and encoder must
+be available through the selected tracking store/Hugging Face cache. The tracking
+URI remains configurable through `SUPPLY_CHAIN_TRACKING_URI`; credentials come
+from the existing environment loader, never from generated reports. The original
+local selection file is untouched. Only this explicit reference-generation command
+loads/downloads the model; the report command operates offline.
+
+Reference artifacts have schema version 1, `kind: reference_predictions`, model
+identity/configuration/checksum, dataset fingerprint/schema, creation time,
+records SHA-256 and records containing `source_row_id`, zero-based
+`source_row_index`, `model_id`, `success`, `cluster_id`. They contain no text.
+Keep these generated artifacts trusted: their hashes detect accidental changes,
+not malicious authors who can rewrite both records and provenance. Existing
+pipeline assignment CSVs are not accepted without verified compatible provenance.
+
+Once a real simulator run is available:
+
+```bash
+uv run python src/monitor_drift.py report \
+  --reference-predictions reports/drift_monitoring/reference-predictions.json \
+  --production-run reports/production_simulation/REAL_RUN_ID \
+  --output reports/drift_monitoring/with-predictions-001
+```
+
+Both prediction inputs must be supplied together. Production assignments come
+exclusively from recorded simulator checkpoints, never from new inference or
+summary cluster counts. The replay plan (including shuffle, limit and batch
+membership), input fingerprint, column mapping, model ID, cluster count, row IDs,
+row indices and cluster ranges are checked. A cooperative simulator lock prevents
+reading an active writer. The simulator records the logical ID returned/validated
+by the API, but not an observed binary checksum: production checksum assurance
+therefore depends on the existing verified API loader and trusted checkpoints.
+
+By default, every CSV row must have exactly one successful prediction. Empty,
+failed, pending, missing, duplicate or incompatible results are rejected. A limited
+or interrupted run can be analysed only with explicit `--allow-subset`. This still
+rejects incompatible IDs/models/configuration and malformed completed batches;
+it reports recorded/successful/failed/missing sample counts and successful-ID
+fingerprints. Prediction comparisons then describe those successful subsets,
+which may suffer selection bias. Input monitoring always compares the complete
+CSV cohorts. A prediction file is never filled with fabricated assignments.
+
+### Statistical protocol and interpretation
+
+The null hypothesis for each input feature is equality of the two population
+distributions. A two-sample Kolmogorov–Smirnov statistic (maximum empirical CDF
+gap, `KS_D`) is calibrated by independent-label permutation. This handles ties in
+integer lengths/counts without assuming the continuous KS null distribution.
+Raw-unit Wasserstein distance and count/mean/population standard deviation,
+minimum, quartiles, median, p95 and maximum describe magnitude and shape.
+
+For clusters, the null is equality of categorical assignment probabilities.
+Pearson's two-sample homogeneity statistic is permutation-calibrated, including
+sparse categories; jointly empty clusters contribute no statistic. This avoids
+an unreliable asymptotic chi-square approximation when expected counts are low.
+Every cluster, including absent clusters, has counts, proportions and
+production-minus-reference proportion deltas. Total variation distance
+(`0.5 * sum(abs(delta))`, range 0–1) measures overall redistribution.
+
+All available inferential tests (two input tests and, when available, one cluster
+test) form one Holm family at `--alpha .05`. The adjusted p-value is reported
+separately from practical importance: default `--practical-threshold .1` means
+`KS_D >= .1` for input features and total variation `>= .1` for clusters. These
+are provisional investigation thresholds, not validated operational limits.
+Use effect sizes and domain review before deciding on action.
+
+The protocol uses SciPy's [independent permutation test](https://docs.scipy.org/doc/scipy/reference/generated/scipy.stats.permutation_test.html),
+`--resamples 1999 --seed 42`, with a greater-tail statistic (large discrepancy is
+evidence against equality); small problems enumerate all distinct partitions.
+Randomized p-values use the conservative +1 correction and have Monte Carlo
+uncertainty and finite resolution (approximately 1/2,000 by default). Increasing
+resamples improves resolution, not the validity of sampling assumptions. Large
+samples can make tiny effects significant; small subsets have limited power.
+Holm handles dependence between features, but the underlying permutation tests
+assume exchangeable, independent observations. Repeated authors, duplicate text,
+time dependence and sampling differences can violate that assumption. No authors
+or timestamps are used to model dependence in this phase. Word count is a simple
+whitespace feature, not token count or a semantic representation.
+
+### Report outputs and limitations
+
+Each new output directory contains:
+
+- `results.json`: schema version, timestamp, dataset hashes/column mappings/sample
+  sizes, dependency versions, test configuration, descriptive statistics, raw
+  and Holm-adjusted p-values, effect sizes and separate significance/practical
+  flags. Predictions include model provenance, artifact/checkpoint fingerprints,
+  coverage and all cluster frequencies when available; otherwise their status is
+  explicitly `unavailable` with a reason. Embeddings are explicitly `deferred`.
+- `input.html` and `input.json`: Evidently distributions and reference-standardized
+  Wasserstein distances, using its explicit 0.1 distance threshold.
+- `predictions.html` and `predictions.json`, only with verified prediction inputs:
+  Evidently categorical distributions and Jensen–Shannon distances with a 0.1
+  distance threshold. These are descriptive supplementary metrics. Evidently's
+  threshold flags are distinct from the permutation/Holm and practical decisions
+  in `results.json`; those JSON conclusions are authoritative for this protocol.
+
+Outputs under `reports/drift_monitoring/` are ignored by Git. Existing report
+folders and reference prediction files are never overwritten. A failed run can
+leave a partial directory; absence of `results.json` means no completed report.
+Statistical results are deterministic for the same inputs, seed and locked
+versions; generation timestamps and HTML identifiers are not byte-deterministic.
+
+Embedding drift is deferred to a separate phase: generating pinned embeddings
+for both cohorts and validating a reference-only projection plus a calibrated
+multivariate comparison would add substantial compute and methodological scope.
+Independent tests of hundreds of coordinates would not establish semantic drift.
+This phase does not evaluate clustering quality, semantic correctness or business
+performance. Drift can prompt investigation; it is not evidence of degradation.
+
+Offline verification: `uv run pytest tests/test_monitor_drift.py -q` uses only
+synthetic CSVs and a mocked frozen predictor/simulator transport. It covers input
+validation, provenance/alignment, incomplete runs, deterministic statistical
+results, identical/shifted distributions, sparse clusters and real HTML exports.

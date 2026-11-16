@@ -22,6 +22,8 @@ dependencies = [
     "spherecluster>=0.1.7",
     "wordcloud>=1.9.6",
     "uvicorn>=0.54.0",
+    "evidently==0.7.23",
+    "scipy>=1.15",
 ]
 
 [dependency-groups]

@@ -76,3 +76,6 @@ mlflow.db
 
 # Generated production inference checkpoints and summaries
 /reports/production_simulation/
+
+# Offline statistical monitoring artifacts
+/reports/drift_monitoring/
