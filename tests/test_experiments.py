@@ -206,9 +206,11 @@ class HeldOutPipelineTests(unittest.TestCase):
                         "-S", f"experiment.seed={seed}")
             self.assertEqual((parent / "encoder_count.txt").read_text().splitlines(), ["loaded"])
             self.assertFalse((root / "models").exists())
+            # DVC --temp overrides do not update the in-memory fixture params.
+            active_params = {**params, "experiment": {**params["experiment"], "seed": 42}}
             with working_directory(root), patch.dict(os.environ, env):
                 experiment.tracking(params)
-                run_experiments.record_revision("offline-42", params, parent / "index")
+                run_experiments.record_revision("offline-42", active_params, parent / "index")
                 info = experiment.read_json(parent / "index/offline-42.json")
                 self.assertEqual(len(info["dvc_revision"]), 40)
                 self.assertEqual(len(info["mlflow_run_ids"]), 2)
@@ -216,7 +218,7 @@ class HeldOutPipelineTests(unittest.TestCase):
             env["SUPPLY_CHAIN_DVC_NAME"] = "offline-cached"
             command("dvc", "exp", "run", "evaluate", "--temp", "--name", "offline-cached", "-S", "experiment.seed=42")
             with working_directory(root), patch.dict(os.environ, env):
-                run_experiments.record_revision("offline-cached", params, parent / "index")
+                run_experiments.record_revision("offline-cached", active_params, parent / "index")
                 reused = experiment.read_json(parent / "index/offline-cached.json")
                 self.assertEqual(reused["mlflow_run_ids"], info["mlflow_run_ids"])
             self.assertEqual((parent / "encoder_count.txt").read_text().splitlines(), ["loaded"])
