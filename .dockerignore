@@ -1,0 +1,15 @@
+# Deny by default: even untracked secrets and artifacts stay outside the context.
+**
+!Dockerfile
+!.dockerignore
+!pyproject.toml
+!uv.lock
+!README.md
+!src/
+!src/api/
+!src/api/__init__.py
+!src/api/main.py
+!src/predict.py
+!src/train.py
+!src/experiment.py
+!src/tracking.py

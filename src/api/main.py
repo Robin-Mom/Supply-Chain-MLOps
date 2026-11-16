@@ -14,7 +14,7 @@ from pydantic import BaseModel, ConfigDict, Field, StringConstraints, field_vali
 
 from experiment import PREPROCESSING, digest, read_json
 from predict import ExperimentPredictor
-from tracking import configure_tracking
+from tracking import configure_tracking, load_tracking_environment
 
 logger = logging.getLogger(__name__)
 UNAVAILABLE = "Selected model unavailable; check selection, tracking access and encoder cache."
@@ -60,9 +60,10 @@ def load_selected_model(selection_path, destination):
             or not re.fullmatch(r"[0-9a-f]{40}", config["encoder"]["revision"])
             or selection["final_seed"] != config["hyperparameters"]["random_state"]):
         raise ValueError("Invalid selected configuration.")
-    # The recorded tracking store resolves runs:/ URIs. Credentials are loaded
-    # by the existing helper, with exported values taking precedence.
-    configure_tracking(selection["tracking_uri"])
+    # Default to the selected store, with an explicit environment override.
+    # Credentials are loaded separately and never embedded in the selection.
+    load_tracking_environment()
+    configure_tracking(os.environ.get("SUPPLY_CHAIN_TRACKING_URI") or selection["tracking_uri"])
     predictor = ExperimentPredictor.from_mlflow(selection["manifest_uri"], destination)
     manifest = predictor.manifest
     for key in ("logical_id", "configuration", "model_sha256", "model_uri"):

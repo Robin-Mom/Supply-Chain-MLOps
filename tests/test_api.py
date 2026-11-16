@@ -160,3 +160,34 @@ def test_real_predictor_loading_offline(tmp_path, monkeypatch, config, method, d
 def test_missing_selection(tmp_path):
     with TestClient(create_app(selection_path=tmp_path / "missing.json")) as client:
         assert client.get("/health").status_code == 503
+
+
+@pytest.mark.parametrize("override", [None, "https://example.test/override.mlflow"])
+def test_selected_tracking_uri_override(tmp_path, monkeypatch, config, override):
+    from api import main as api_main
+
+    selection = {"logical_id": digest(config), "configuration": config, "final_seed": 42,
+                 "tracking_uri": "https://example.test/selected.mlflow",
+                 "manifest_uri": "runs:/selected/clustering/manifest.json",
+                 "model_uri": "runs:/selected/clustering/model.joblib", "model_sha256": "expected",
+                 "train_mlflow_run_id": "selected"}
+    path = tmp_path / "selection.json"
+    path.write_text(json.dumps(selection))
+    if override:
+        monkeypatch.setenv("SUPPLY_CHAIN_TRACKING_URI", override)
+    else:
+        monkeypatch.delenv("SUPPLY_CHAIN_TRACKING_URI", raising=False)
+    environment = Mock()
+    configure = Mock()
+    monkeypatch.setattr(api_main, "load_tracking_environment", environment)
+    monkeypatch.setattr(api_main, "configure_tracking", configure)
+    predictor = SimpleNamespace(
+        manifest={**selection, "mlflow_run_id": "selected"},
+        bundle={"model": Mock(get_params=Mock(return_value=config["hyperparameters"]))},
+        predict_texts=Mock())
+    download = Mock(return_value=predictor)
+    monkeypatch.setattr(api_main.ExperimentPredictor, "from_mlflow", download)
+    assert api_main.load_selected_model(path, tmp_path / "artifacts") is predictor
+    environment.assert_called_once_with()
+    configure.assert_called_once_with(override or selection["tracking_uri"])
+    download.assert_called_once_with(selection["manifest_uri"], tmp_path / "artifacts")

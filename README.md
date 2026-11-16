@@ -289,8 +289,10 @@ Les credentials sont lus par `tracking.py` dans `.env.dagshub.local` ou dans les
 variables exportées, prioritaires : `MLFLOW_TRACKING_USERNAME` et
 `MLFLOW_TRACKING_PASSWORD` (ou `DAGSHUB_USER_TOKEN` / `DAGSHUB_CLIENT_TOKEN`).
 `SUPPLY_CHAIN_ENV_FILE` permet de choisir un autre fichier local ignoré. L'URI
-du tracking est celle de la sélection, indépendamment des paramètres de la
-dernière expérience DVC. Ne placer aucun identifiant dans les URI.
+du tracking est celle de la sélection par défaut ; `SUPPLY_CHAIN_TRACKING_URI`
+permet un override explicite, indépendamment des paramètres de la dernière
+expérience DVC. Les contrôles du modèle sélectionné restent obligatoires.
+Ne placer aucun identifiant dans les URI.
 Les poids Hugging Face doivent être en cache ou téléchargeables au démarrage ;
 `HF_HOME` permet de choisir le cache et `HF_HUB_OFFLINE=1` impose son usage hors
 ligne. Le clustering et l'encodeur sont réutilisés entre requêtes. Utiliser un
@@ -330,6 +332,176 @@ MLFLOW_DISABLE_AGENT_HINT=1 OPENBLAS_NUM_THREADS=1 OMP_NUM_THREADS=1 \
 MLFLOW_DISABLE_AGENT_HINT=1 OPENBLAS_NUM_THREADS=1 OMP_NUM_THREADS=1 \
   uv run --frozen pytest tests -q
 ```
+
+## Docker : inférence locale
+
+Prérequis : Docker Engine avec BuildKit et Docker Compose v2+, accès au moteur
+Docker, accès réseau aux registres pendant le build et assez d'espace pour les
+dépendances ML verrouillées. Aucun GPU ni environnement Python hôte n'est requis.
+
+```bash
+cp docker.env.example .env.docker.local
+chmod 600 .env.docker.local
+# Renseigner les credentials existants dans ce fichier local, sans les afficher.
+docker compose config -q
+docker compose build api
+docker compose up -d --wait --wait-timeout 660
+docker compose ps
+```
+
+`.env.docker.local` est déjà ignoré par la règle `.env.*`. Compose injecte ses
+variables uniquement à l'exécution. Le fichier n'entre pas dans le contexte de
+build. Pour DagsHub, fournir `MLFLOW_TRACKING_USERNAME` et `DAGSHUB_USER_TOKEN`
+ou `MLFLOW_TRACKING_PASSWORD`. Un `SUPPLY_CHAIN_TRACKING_URI` optionnel dans ce
+fichier remplace l'URI par défaut sans réécrire la sélection ; les identifiants
+et checksums restent vérifiés. Éviter `docker compose config` sans `-q`,
+qui afficherait les variables résolues, credentials inclus.
+
+Le fichier hôte monté par défaut est
+`config/selection.docker.json`, en lecture seule. Il référence le run DagsHub
+`c650a6675bf5438c81d90b96ee4e154c` sur
+`https://dagshub.com/mom.robin.63/Supply-Chain-MLOps.mlflow`. Le manifeste et le
+bundle distant ont été vérifiés contre la configuration de la sélection locale,
+l'identifiant logique
+`c93cb37fac6cbebb9f3cce20cb962722c0190a5e588afffbb80f6512eebafab0` et le SHA-256
+`0576bf251a3b4daad93598bc971669d32b18e71d9fd5a9b1b98034486ca3f4af`.
+Ce fichier Docker ne contient ni credentials ni références SQLite locales.
+`reports/experiment_selection/selection.json` reste inchangé, et aucun montage
+de base ou d'artefacts locaux n'est nécessaire pour ce run distant. Pour utiliser
+un autre chemin **vers la même sélection validée**, définir une variable shell :
+
+```bash
+export SUPPLY_CHAIN_SELECTION_FILE=/chemin/vers/selection.json
+docker compose up -d --wait --wait-timeout 660
+```
+
+`SUPPLY_CHAIN_SELECTION_PATH` configure le chemin **dans le conteneur**, par
+défaut `/app/config/selection.json` ; Compose l'utilise aussi comme cible du
+montage. Ces deux variables doivent être exportées dans le shell ou fournies
+via `docker compose --env-file .env.docker.local ...` pour l'interpolation
+Compose. Un simple `env_file` du service fournit les variables au processus,
+pas à l'interpolation du YAML. Le montage refuse de créer un répertoire si le
+fichier source manque. Ne pas générer une nouvelle sélection pour démarrer.
+
+La sélection locale historique peut référencer SQLite et des artefacts `file://` locaux.
+Dans ce cas, le Compose standard ne suffit pas : les chemins absolus contenus
+dans `tracking_uri` et dans la base doivent exister dans le conteneur. Ne pas
+remplacer ces références par celles d'un autre modèle. Une sélection DagsHub
+portable doit être vérifiée avant usage ; aucun fichier de sélection n'est
+réécrit par Docker.
+
+Pour une sélection SQLite, utiliser un override local hors dépôt, par exemple
+`/tmp/compose.mlflow.local.yaml`, avec les chemins réellement lus dans les
+métadonnées. Préférer une sauvegarde SQLite cohérente et jetable pour que
+l'initialisation MLflow ne puisse pas modifier la base historique. Conserver son
+nom de fichier et monter son dossier au chemin parent attendu par l'URI ; le
+dossier de copie doit être accessible en écriture à l'UID 10001 pour les fichiers
+SQLite auxiliaires. Monter le dossier d'artefacts original en lecture seule :
+
+```yaml
+services:
+  api:
+    volumes:
+      - type: bind
+        source: /chemin/hote/copie-sqlite
+        target: /chemin/absolu/parent-attendu-par-tracking-uri
+        bind:
+          create_host_path: false
+      - type: bind
+        source: /chemin/hote/artefacts-du-run-selectionne
+        target: /chemin/absolu/artefacts-enregistre-dans-mlflow
+        read_only: true
+        bind:
+          create_host_path: false
+```
+
+```bash
+docker compose -f compose.yaml -f /tmp/compose.mlflow.local.yaml config -q
+docker compose -f compose.yaml -f /tmp/compose.mlflow.local.yaml \
+  up -d --wait --wait-timeout 660
+```
+
+Utiliser ces mêmes options `-f` pour toutes les commandes suivantes si cet
+override est nécessaire. Les chemins hôtes restent dans l'override local, jamais
+dans l'image. La sélection est montée telle quelle, et le modèle conserve ses
+vérifications de checksum, configuration, seed et révision d'encodeur.
+
+L'image comporte un étage de construction avec uv 0.10.2 et un étage d'exécution
+Python 3.12.12 slim Bookworm, avec les deux images épinglées par digest.
+`uv sync --locked --no-dev --no-install-project`
+installe les dépendances de production depuis `uv.lock`, sans le modifier.
+Le compilateur et uv restent dans le builder ; seul `libgomp1` est ajouté à
+l'étage final avec l'environnement Python construit. La liste de fichiers copiés
+et `.dockerignore` excluent données, modèles, `.venv`, Git et secrets.
+Le processus utilise l'UID/GID 10001, sans capacités Linux supplémentaires,
+avec `no-new-privileges`. Le port hôte est limité à `127.0.0.1:8000`.
+
+Cette première image conserve tout le groupe de dépendances de production du
+projet pour respecter le lock existant. Celui-ci inclut les bibliothèques CUDA
+de PyTorch et des bibliothèques d'expérimentation : l'image est volumineuse même
+si l'exécution est CPU (`CUDA_VISIBLE_DEVICES` vide, aucun GPU exposé). Un lock
+CPU et un groupe d'inférence séparés seraient une optimisation ultérieure.
+
+Le volume nommé `huggingface-cache` est monté sur `/cache/huggingface` et initialisé
+avec les permissions de l'utilisateur applicatif. Il survit aux redémarrages,
+recréations et à `docker compose down`. Les poids de la révision figée sont
+réutilisés ; Hugging Face peut encore vérifier des métadonnées en ligne.
+Après un premier chargement réussi, on peut imposer leur usage hors ligne :
+
+```bash
+HF_HUB_OFFLINE=1 docker compose up -d --force-recreate --wait --wait-timeout 660
+```
+
+Cela désactive uniquement le réseau Hugging Face, pas les téléchargements MLflow.
+`ExperimentPredictor.from_mlflow()` écrit dans la destination fournie par le
+lifespan, qui est un `TemporaryDirectory` nettoyé à l'arrêt. Il n'implémente pas
+de cache d'artefacts persistant : le manifeste et le petit bundle de clustering
+sont donc récupérés à chaque démarrage. Monter un volume sur `/tmp` ne changerait
+pas ce comportement. Aucun volume MLflow trompeur n'est ajouté et aucun code
+d'inférence n'est modifié pour cette étape. Les artefacts d'un store local,
+lorsqu'ils sont montés, restent bien sur l'hôte.
+
+```bash
+curl --fail http://127.0.0.1:8000/health
+curl --fail http://127.0.0.1:8000/model/info
+curl --fail -X POST http://127.0.0.1:8000/predict \
+  -H 'Content-Type: application/json' \
+  -d '{"texts":["Livraison rapide et produit conforme","Commande jamais reçue","Service client très réactif"]}'
+docker compose logs --tail=100 api
+docker compose restart api
+docker compose ps
+docker compose stop
+docker compose down
+```
+
+Pour ces trois avis dans cet ordre, la référence locale validée est `[6, 7, 6]`.
+Vérifier aussi `model_id` dans `/model/info` et `/predict`. Toute différence
+d'identité, checksum ou prédiction doit être investiguée ; ne pas choisir un
+autre modèle automatiquement. Le volume Hugging Face est conservé, tandis que
+les deux petits artefacts MLflow sont récupérés depuis DagsHub à chaque démarrage.
+
+Le healthcheck Python n'exige pas curl dans l'image. Il vérifie HTTP 200 et
+`model_ready: true` sur `/health` toutes les 30 secondes, avec un timeout de
+5 secondes, trois échecs tolérés et une grâce de 10 minutes pour le premier
+téléchargement. Pendant le lifespan, Uvicorn peut ne pas encore accepter les
+connexions ; cela ne signifie jamais que le modèle est prêt. Un démarrage raté
+reste non sain et les endpoints de modèle répondent 503.
+
+En cas d'erreur d'authentification, vérifier le fichier runtime et les droits de
+lecture du run sélectionné, puis recréer le service. Si la sélection manque,
+vérifier son chemin hôte et ne pas lancer de nouveau sweep. Pour un store local,
+vérifier séparément le montage SQLite et le chemin des artefacts. Pour les poids,
+vérifier le réseau et l'espace disque, retirer `HF_HUB_OFFLINE=1` si le cache
+n'a jamais été rempli. Avec un volume hôte personnalisé, assurer l'accès à
+l'UID 10001 ; les volumes Docker nommés utilisent les permissions de l'image.
+`docker compose down --volumes` supprime le cache et impose de télécharger les
+poids à nouveau : ne l'utiliser que pour une remise à zéro volontaire.
+
+Les tests Python restent exécutables avec la commande de la section précédente ;
+pytest n'est pas installé dans l'image de production. La syntaxe Compose,
+le build et les appels réels ci-dessus constituent les vérifications Docker.
+La construction suit le [guide Docker de uv](https://docs.astral.sh/uv/guides/integration/docker/)
+et les montages la [référence Compose](https://docs.docker.com/reference/compose-file/services/).
 
 ## Vérifications hors ligne
 

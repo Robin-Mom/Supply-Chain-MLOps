@@ -1,0 +1,36 @@
+services:
+  api:
+    image: supply-chain-inference:local
+    build:
+      context: .
+      target: runtime
+    init: true
+    ports:
+      - "127.0.0.1:8000:8000"
+    # This ignored file is read by Compose, never copied into the image.
+    env_file:
+      - .env.docker.local
+    environment:
+      SUPPLY_CHAIN_SELECTION_PATH: ${SUPPLY_CHAIN_SELECTION_PATH:-/app/config/selection.json}
+      SUPPLY_CHAIN_ENV_FILE: /app/config/no-local-env
+      HF_HOME: /cache/huggingface
+      HF_HUB_OFFLINE: ${HF_HUB_OFFLINE:-0}
+      CUDA_VISIBLE_DEVICES: ""
+    volumes:
+      - type: bind
+        source: ${SUPPLY_CHAIN_SELECTION_FILE:-./config/selection.docker.json}
+        target: ${SUPPLY_CHAIN_SELECTION_PATH:-/app/config/selection.json}
+        read_only: true
+        bind:
+          create_host_path: false
+      - type: volume
+        source: huggingface-cache
+        target: /cache/huggingface
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    stop_grace_period: 30s
+
+volumes:
+  huggingface-cache:
