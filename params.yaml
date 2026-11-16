@@ -32,9 +32,9 @@ exploration:
   - 45
   - 46
 experiment:
-  encoder: mpnet
-  method: kmeans
-  seed: 42
+  encoder: minilm
+  method: spherical_kmeans
+  seed: 46
 tracking:
   # Local only: credentials are loaded into the environment, never DVC outputs.
   env_file: .env.dagshub.local
