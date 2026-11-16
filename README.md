@@ -1104,3 +1104,126 @@ Offline verification: `uv run pytest tests/test_monitor_drift.py -q` uses only
 synthetic CSVs and a mocked frozen predictor/simulator transport. It covers input
 validation, provenance/alignment, incomplete runs, deterministic statistical
 results, identical/shifted distributions, sparse clusters and real HTML exports.
+
+## Phase 7A — Frozen independent final evaluation
+
+`src/evaluate_final.py` audits and seals a final protocol before any inference.
+Checkpoint **7A-1 requires explicit approval** before `--execute`. The file named
+`avis_3k_test.csv` actually contains **2,261** rows in this checkout. The owner
+explicitly authorized preparing the protocol for those 2,261 observations; no
+rows are added, removed or represented as a 3,000-observation evaluation.
+
+```bash
+# Audit only: validates CSV/IDs and fingerprints; never loads/encodes the model.
+uv run python src/evaluate_final.py --audit-only \
+  --input data/processed/avis_3k_test.csv --expected-rows 2261 \
+  --output reports/final_evaluation/checkpoint_7a1_20261116_ready
+
+# AFTER explicit checkpoint approval only; this command has not yet been run:
+HF_HUB_OFFLINE=1 CUDA_VISIBLE_DEVICES='' OMP_NUM_THREADS=4 OPENBLAS_NUM_THREADS=4 \
+  uv run python src/evaluate_final.py --execute \
+  --protocol reports/final_evaluation/checkpoint_7a1_20261116_ready/protocol.json \
+  --batch-size 32 --output reports/final_evaluation/final_20261116
+```
+
+Existing output directories are never overwritten. The audit creates
+`protocol.json` and `seal.json` with its SHA-256. Changing any protocol field,
+selection, dataset, audited cohort, inference/metric source code or software version invalidates execution. The protocol seals source and uv.lock hashes plus package versions. Before inference,
+execution exclusively creates `execution_claim.json` beside the approved protocol,
+reserving it across output directories. An interrupted/failed claim is retained:
+stop and inspect rather than deleting it or silently rerunning the final test.
+The program cannot enforce human approval: the operator must obtain approval
+before invoking `--execute`. Batch size affects resource use, not metric sampling.
+Create a fresh audit only if a changed input is intentionally reviewed and approved;
+never use new protocols to repeatedly evaluate or tune on the final results.
+
+### Independence evidence and limits
+
+The preflight checks unique, nonblank final IDs and disjointness against the actual
+20,000 training IDs, 4,000 selection-evaluation IDs, 4,000 reference IDs and 8,000
+production IDs. It seals their file hashes, checks that the local original selection
+and Docker selection agree on logical ID, configuration and binary checksum, and
+retains the historical selection rule/ranking only as context. It also reports how many final rows share exactly the same stripped text with each cohort, without persisting text or dropping rows. Repeated generic reviews can match across different IDs; that overlap limits independence without proving reuse of the same observation. Current pipeline
+inputs and prior monitoring configuration exclude the final file; drift thresholds
+were fixed in phase 6D, before accessing final identifiers.
+
+This establishes current row-ID disjointness, not a complete proof of all historical
+use: there is no immutable complete usage ledger. Unrecorded earlier use, repeated
+review text across distinct IDs and dependence across authors/time cannot be ruled
+out. The selected training-cache ID was also reconstructed from the current training CSV SHA-256, encoder, preprocessing and column specification; it matches the selected configuration. This binds the declared selected training input to the audited CSV. It does not prove all historical uses of data or that nobody inspected test data earlier. This limitation must be acknowledged
+before approval, not hidden in the eventual final scores.
+
+### Frozen inference and metrics
+
+The workflow reuses `api.main.load_selected_model`: MLflow manifest/run selection,
+binary SHA-256, logical configuration digest, pinned encoder revision, preprocessing
+and estimator hyperparameters are checked before final prediction. The actual
+estimator must be `SphericalKMeans` with the selected number of unit centroids.
+`ExperimentPredictor.predict_texts(..., return_embeddings=True)` optionally returns
+the **same normalized embeddings** used by the existing prediction path. Default
+API behavior still returns labels only. No parallel encoder implementation, refit,
+transform fitting, keyword naming, semantic annotation or model selection occurs.
+Original centroid bytes are checked for mutation after inference.
+
+The sealed metrics are:
+
+- **Exact cosine silhouette**, using all final observations and frozen predicted
+  labels, via the existing chunked `held_out_silhouette` helper (32 MiB working
+  memory; sample size 0). Silhouette compares mean pairwise intra-/nearest-other
+  cluster distances; it is not distance to the trained centroid. It is undefined
+  for fewer than two represented clusters or one cluster per observation, with
+  explicit null/reason. Scikit-learn assigns singleton-cluster silhouettes zero.
+  No Euclidean silhouette or Euclidean Davies–Bouldin score is mixed into this protocol.
+- **Cluster population**, all configured IDs including empty clusters: counts,
+  proportions, represented/empty IDs, largest proportion, largest/smallest nonempty
+  count ratio. Imbalance is descriptive and is not assumed undesirable.
+- **Frozen-centroid geometry**: assigned similarity `x dot c`, dispersion
+  `1 - x dot c`, assignment margin `x dot c_assigned - max(x dot c_other)`, and
+  pairwise original-centroid cosine distances. Unit/finite vectors, cluster ranges
+  and agreement with original-centroid argmax are required. Empty cluster summaries
+  are explicitly unavailable; singleton summaries are valid descriptive values.
+  No centroid is recomputed from final data or used to redefine predictions.
+- **Previous metrics**, available only with `--previous-result` during audit and
+  verified matching logical ID, complete configuration, binary checksum, selection
+  cohort fingerprint and exact cosine sampling protocol/sample count. Different
+  cohorts remain different populations: a score difference is descriptive, not
+  evidence of quality change. No verified individual selected-seed result was
+  found locally at preflight. The five-seed selection mean/ARI remains historical
+  context, never substituted for that missing individual result or training quality.
+- **Uncertainty** is explicitly not estimated. Deterministic repeated predictions
+  do not estimate training stability; no model is refitted. A dependence-aware
+  resampling design would require separate justification. Geometric separation
+  does not establish semantic correctness, topic usefulness or business value.
+
+### Artifacts and reproducibility
+
+Outputs are ignored under `reports/final_evaluation/`, with private run-directory
+permissions. Schema version 1 artifacts include:
+
+- `predictions.csv`: source ID, zero-based source row index, logical model ID,
+  success flag, cluster ID, assigned centroid similarity/distance and margin;
+  no raw review text or author metadata.
+- `embeddings.npy`, `original_centroids.npy`: exact numeric arrays used for metrics,
+  saved without pickle, for reproducibility. These are local data artifacts and
+  must not be published indiscriminately.
+- `metrics.json`: exact cosine silhouette/sample fingerprint and explicit reasons
+  when undefined, cluster statistics, original centroid distances, descriptive
+  geometry, comparison availability and uncertainty status.
+- `protocol.json`, `metadata.json`: dataset/model/configuration fingerprints,
+  software versions, full coverage, centroid hash, artifact SHA-256 hashes, runtime
+  and Git revision. `execution_state.json` marks started/complete. Only a complete
+  state with metadata constitutes a successful evaluation; partial outputs survive
+  failures for diagnosis and must not be reported as completed results.
+- `figures/`: cluster populations, assigned-centroid similarity boxplots and margin
+  histogram, exported as 300-dpi PNG and vector SVG with fixed layouts. A comparison
+  figure is omitted when no compatible historical individual result is available.
+
+The exact dataset and selected model stay frozen after evaluation. Do not change
+hyperparameters, thresholds, metrics or the model based on final results. Tests in
+`tests/test_evaluate_final.py` use synthetic vectors/CSVs only, with mocked inference
+and explicit checks against fitting or centroid mutation:
+
+```bash
+uv run pytest tests/test_evaluate_final.py -q
+uv run pytest tests -q
+```

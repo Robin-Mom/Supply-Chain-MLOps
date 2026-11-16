@@ -82,3 +82,6 @@ mlflow.db
 
 # Generated end-to-end runtime validation reports
 /reports/integration_validation/
+
+# Independent frozen-model final evaluation artifacts
+/reports/final_evaluation/

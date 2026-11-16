@@ -115,7 +115,7 @@ class ExperimentPredictor:
             artifact_uri=manifest["model_uri"], dst_path=str(destination))
         return cls(manifest)
 
-    def predict_texts(self, texts, batch_size=32, device=None):
+    def predict_texts(self, texts, batch_size=32, device=None, *, return_embeddings=False):
         """Load the pinned encoder lazily and reuse it across API requests."""
         from sentence_transformers import SentenceTransformer
         from experiment import PREPROCESSING
@@ -129,12 +129,15 @@ class ExperimentPredictor:
             self.encoder = SentenceTransformer(spec["id"], revision=spec["revision"], device=device,
                                               trust_remote_code=False, model_kwargs={"use_safetensors": True})
             self.encoder.max_seq_length = spec["max_seq_length"]
-        labels = []
+        labels, blocks = [], []
         for start in range(0, len(cleaned), batch_size):
             block = self.encoder.encode(cleaned[start:start + batch_size], batch_size=batch_size,
                                         normalize_embeddings=True, convert_to_numpy=True)
             labels.append(self.predict_cached(block))
-        return np.concatenate(labels)
+            if return_embeddings:
+                blocks.append(validate_embeddings(block))
+        predictions = np.concatenate(labels)
+        return (predictions, np.concatenate(blocks)) if return_embeddings else predictions
 
 
 def predict_experiment(params):
