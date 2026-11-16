@@ -335,7 +335,7 @@ MLFLOW_DISABLE_AGENT_HINT=1 OPENBLAS_NUM_THREADS=1 OMP_NUM_THREADS=1 \
 
 ## Docker : inférence locale
 
-Le déploiement utilise trois services sur le réseau Compose par défaut :
+Le déploiement utilise quatre services sur le réseau Compose par défaut :
 `client → 127.0.0.1:8080 → nginx:80 → api:8000`. NGINX résout le nom de service
 `api` avec le DNS Docker ; `localhost` dans NGINX désignerait le proxy lui-même.
 La résolution dynamique permet de retrouver l'API si son adresse change après
@@ -352,6 +352,9 @@ dépendances ML verrouillées. Aucun GPU ni environnement Python hôte n'est req
 ```bash
 cp docker.env.example .env.docker.local
 chmod 600 .env.docker.local
+# Au premier démarrage seulement : créer puis renseigner les credentials Grafana.
+test -f .env.grafana.local || cp grafana.env.example .env.grafana.local
+chmod 600 .env.grafana.local
 # Renseigner les credentials existants dans ce fichier local, sans les afficher.
 docker compose config -q
 docker compose build api
@@ -510,7 +513,7 @@ Les access logs contiennent méthode, chemin sans query string, statut, durée
 et adresse cliente, sans corps de requête ni en-tête d'autorisation.
 Seul `api` reçoit `.env.docker.local` ; NGINX ne reçoit aucun credential MLflow.
 
-Les trois services utilisent `restart: unless-stopped`. NGINX attend initialement
+Les quatre services utilisent `restart: unless-stopped`. NGINX attend initialement
 que l'API soit saine (`depends_on: condition: service_healthy`). Son healthcheck
 appelle ensuite `/health` à travers le proxy : si l'API devient indisponible,
 NGINX devient également non sain après les échecs configurés. La condition de
@@ -672,8 +675,112 @@ docker compose down
 
 Ces métriques décrivent le fonctionnement du service, pas la qualité sémantique
 des clusters, la dérive des données ou la pertinence des prédictions. Aucun jeu
-de simulation, référence monitoring ou test final n'est utilisé. Grafana,
-Evidently, alertes et simulation restent hors de cette phase.
+de simulation, référence monitoring ou test final n'est utilisé. Evidently, alertes et simulation restent hors de cette phase. Grafana utilise
+ces métriques opérationnelles selon la section suivante.
+
+## Grafana : dashboards provisionnés
+
+L'image officielle `grafana/grafana:13.2.2` est épinglée par version et digest.
+Le quatrième service accède à `http://prometheus:9090` sur le réseau Compose
+existant. Son interface est limitée à `http://127.0.0.1:3000`, avec un volume
+`grafana-data` pour la base, les utilisateurs et leurs préférences. Les credentials
+DagsHub restent exclusivement dans `api` ; Grafana utilise un fichier séparé.
+
+Avant le premier démarrage, copier `grafana.env.example` vers
+`.env.grafana.local`, ignoré par Git, et définir `GF_SECURITY_ADMIN_USER` et
+`GF_SECURITY_ADMIN_PASSWORD` avec un mot de passe fort et unique. Protéger le
+fichier avec `chmod 600 .env.grafana.local`, puis se connecter avec ces valeurs.
+Un fichier vide empêche le démarrage ; aucun mot de passe n'est livré dans Git.
+Lors de la validation par l'agent, un fichier local a été créé avec un mot de
+passe aléatoire ; consulter ce fichier dans son éditeur, sans le partager.
+Ces variables initialisent uniquement une nouvelle base Grafana : modifier le
+fichier ne réinitialise pas le mot de passe d'un utilisateur existant. Utiliser
+ensuite la gestion des utilisateurs dans Grafana pour le changer, sans supprimer
+le volume. Les accès anonymes, inscriptions et dashboards publics sont désactivés.
+Ne pas publier `docker compose config` sans `-q`, qui afficherait les secrets.
+
+```bash
+docker compose config -q
+docker compose up -d --wait --wait-timeout 660
+docker compose logs --tail=100 grafana
+```
+
+Le healthcheck `/api/health` confirme le service et sa base ; le statut de la
+source Prometheus se vérifie séparément. Si 3000 est occupé, résoudre le conflit
+avant de démarrer, sans arrêter de service tiers.
+
+Le provisioning en lecture seule est versionné sous `monitoring/grafana/` :
+
+- `provisioning/datasources/prometheus.yml` : source par défaut, UID stable
+  `supply-chain-prometheus`, accès proxy interne et intervalle minimum 15 s.
+- `provisioning/dashboards/dashboards.yml` : dossier **Supply Chain MLOps**, lecture
+  des fichiers JSON toutes les 30 s, sauvegarde UI désactivée.
+- `dashboards/api-performance.json` : dashboard **API Performance**, UID
+  `supply-chain-api`. Statut du scrape, requêtes actives, cumul depuis le démarrage,
+  fraction d'erreurs HTTP 4xx/5xx, débits par route et statut, durées p50/p95/p99.
+- `dashboards/model-serving-health.json` : dashboard **Model Serving Health**, UID
+  `supply-chain-model`. Readiness, statut du scrape, cumul des requêtes POST
+  `/predict`, fraction d'erreurs, débit et durées p50/p95/p99 d'inférence HTTP.
+
+Ouvrir `http://127.0.0.1:3000/d/supply-chain-api` et
+`http://127.0.0.1:3000/d/supply-chain-model` après connexion. Les durées sont en
+secondes, les débits en requêtes/s et les fractions en pourcentage. Le cumul
+compte des requêtes HTTP, tous statuts, pas des avis ni des prédictions
+individuelles ; il repart de zéro au redémarrage de l'API. La latence inclut la
+file d'attente et le traitement HTTP complet, pas uniquement le calcul du modèle.
+
+La plage initiale est d'une heure et le rafraîchissement de 15 s. Les expressions
+`$__rate_interval` s'adaptent au zoom, avec plusieurs scrapes pour calculer les
+débits. Les valeurs absentes restent **No samples** ou des interruptions de courbe.
+Une fraction d'erreurs nulle est déduite uniquement si du trafic est effectivement
+observé ; sans trafic elle reste absente. Les quantiles sans observations ne
+deviennent pas artificiellement une latence nulle. Le compteur de readiness
+et `up` sont deux jauges distinctes : un scrape UP n'assure pas un modèle prêt.
+
+Pour générer quelques observations de validation, répéter manuellement les avis
+de référence avec un intervalle d'au moins 15 s, sans jeu de simulation :
+
+```bash
+curl --fail http://127.0.0.1:8080/health
+curl --fail -X POST http://127.0.0.1:8080/predict \
+  -H 'Content-Type: application/json' \
+  -d '{"texts":["Livraison rapide et produit conforme","Commande jamais reçue","Service client très réactif"]}'
+```
+
+Les clusters attendus sont `[6, 7, 6]`. Laisser deux à quatre scrapes à Prometheus
+pour que les courbes et quantiles aient des échantillons. En cas de panneaux
+vides, vérifier le job `fastapi` UP dans Prometheus, la readiness, la plage de
+temps et les observations de `/predict`, puis le statut de la source dans Grafana.
+Les healthchecks seuls alimentent les panneaux API, pas les panneaux `/predict`.
+Une absence de trafic ou une cible DOWN ne doit pas être corrigée en remplaçant
+les valeurs manquantes par zéro.
+
+Pour modifier les dashboards, éditer les JSON dans le dépôt puis attendre le
+provisioning ou redémarrer Grafana. Garder les UID stables. Les modifications UI
+ne sont pas sauvegardées sur les fichiers ; une copie de travail exportée de
+Grafana doit être reportée dans les JSON versionnés. La suppression d'un fichier
+provisionné supprime son dashboard géré. Le fonctionnement suit la
+[documentation officielle de provisioning](https://grafana.com/docs/grafana/latest/administration/provisioning/).
+
+```bash
+# Tests de structure et régression hors ligne
+MLFLOW_DISABLE_AGENT_HINT=1 OPENBLAS_NUM_THREADS=1 OMP_NUM_THREADS=1 \
+  uv run --frozen pytest tests -q
+# Tests réels, stack explicitement démarré, credentials lus sans affichage
+RUN_MONITORING_INTEGRATION=1 RUN_GRAFANA_INTEGRATION=1 \
+  uv run --frozen pytest tests/integration -q
+docker compose restart grafana
+docker compose down
+```
+
+Les tests JSON vérifient les UID, métriques existantes et dispositions. Les tests
+Grafana API vérifient le provisioning, la source accessible et les résultats
+numériques des requêtes de tous les panneaux ; cela ne constitue pas une
+inspection visuelle dans un navigateur. Le volume Grafana survit aux
+redémarrages et à `down`, avec le même projet Compose ; `down --volumes` le
+supprimerait, ainsi que la TSDB et le cache Hugging Face. Ce monitoring ne mesure
+ni dérive des données ni qualité des clusters. Aucun Evidently, nouveau metric,
+jeu de production simulé ou mécanisme d'alerte n'est ajouté.
 
 ## Vérifications du pipeline hors ligne
 
