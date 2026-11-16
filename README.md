@@ -1227,3 +1227,50 @@ and explicit checks against fitting or centroid mutation:
 uv run pytest tests/test_evaluate_final.py -q
 uv run pytest tests -q
 ```
+
+## Phase 7B — Local exploratory semantic inspection
+
+Reuse the completed Phase 7A `predictions.csv`, metrics and fingerprinted source
+CSV; do not invoke inference, regenerate embeddings or rerun the final evaluation.
+
+```bash
+uv run python src/sample_semantic_inspection.py --seed 42 \
+  --output reports/final_evaluation/semantic_inspection_20261116
+```
+
+The output directory must be new: existing annotations are never overwritten.
+Defaults reference `reports/final_evaluation/final_20261116` and
+`data/processed/avis_3k_test.csv`. The script checks completed evaluation provenance,
+prediction/metric/source fingerprints, full ID/index alignment and cluster counts.
+It reads no embeddings or model artifacts and has no inference dependency.
+
+For each cluster, select 4 highest assigned similarities, then 3 closest to that
+cluster's median similarity over all final rows, then 3 lowest margins among
+remaining eligible rows. Ties use the rank obtained by shuffling lexically sorted
+source IDs with Python `random.Random(42)`. IDs are globally distinct and stripped
+texts are distinct within each cluster; original text is preserved in the output.
+Collisions skip to the next eligible candidate. Impossible quotas fail explicitly.
+Ordering and tie resolution are independent of prediction CSV row order.
+
+Generated local files are `annotation_sample.csv`, `annotation_guide.md` and
+`sampling_metadata.json`. The CSV has ID, cluster, similarity, margin, category,
+original text and empty `proposed_theme`, `thematic_consistency`, `ambiguity`,
+`comments` columns. Metadata records seed/rules, fingerprints, skipped candidates
+and any deviations. The directory is mode 0700 and the text-bearing CSV is mode
+0600; everything remains ignored under `reports/final_evaluation/`. Do not publish
+raw texts. Human annotation must not edit the frozen predictions or metrics.
+
+The guide distinguishes ambiguity, thematic mismatch and insufficient context.
+There are no inferred cluster themes or semantic labels before human annotation.
+Equal cluster quotas and intentional geometry-based extremes make this sample
+exploratory, not representative; it cannot estimate unbiased global accuracy.
+
+The sanitized final project synthesis is saved alongside the local sample as
+`project_synthesis.md`, with source report hashes and verification evidence in
+`project_synthesis_sources.json` and `sample_validation.json`. It summarizes model
+selection, deployment/integration, production, drift and final geometry without
+review texts or invented semantic conclusions. Synthetic-only sampler tests:
+
+```bash
+uv run pytest tests/test_semantic_inspection.py -q
+```
