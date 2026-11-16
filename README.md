@@ -782,6 +782,150 @@ supprimerait, ainsi que la TSDB et le cache Hugging Face. Ce monitoring ne mesur
 ni dérive des données ni qualité des clusters. Aucun Evidently, nouveau metric,
 jeu de production simulé ou mécanisme d'alerte n'est ajouté.
 
+## Simulation de production : client hôte
+
+`src/simulate_production.py` lit uniquement le CSV choisi et envoie des lots
+séquentiels à NGINX, sans charger de modèle ni écrire dans MLflow. Pour cette
+phase, utiliser exclusivement `data/processed/avis_8k_production.csv` : 8 000
+lignes, texte `commentaire`, identifiant stable dans la première colonne sans
+nom (`--id-column ''`). Ni auteurs, titres, notes ni textes ne sont écrits dans
+les résultats. Les jeux de référence et de test final ne sont pas utilisés.
+Le client utilise uniquement la bibliothèque standard Python, sans dépendance
+supplémentaire ni nouveau service Docker.
+
+Un timeout récent au démarrage Docker n'a pas été diagnostiqué dans cette phase.
+Le simulateur ne démarre pas le stack et ne résout pas cette panne. Le dry-run
+et les tests hors ligne ne nécessitent aucune API disponible.
+
+```bash
+# Inspecter le plan d'un petit sous-ensemble, sans réseau et sans sortie sur disque
+uv run --frozen python src/simulate_production.py --dry-run --limit 6 --batch-size 2
+
+# Smoke test réel, seulement lorsque l'API est disponible
+uv run --frozen python src/simulate_production.py \
+  --limit 6 --batch-size 2 --delay 2 --run-id smoke-6
+
+# Reprendre ce même run après interruption, avec les mêmes options
+uv run --frozen python src/simulate_production.py \
+  --limit 6 --batch-size 2 --delay 2 \
+  --resume reports/production_simulation/smoke-6
+```
+
+La simulation complète n'est pas exécutée par défaut dans la validation de cette
+phase. La commande suivante traite l'intégralité du fichier lorsqu'on décide
+explicitement de la lancer ; **ne pas la lancer pour un simple smoke test** :
+
+```bash
+uv run --frozen python src/simulate_production.py \
+  --batch-size 16 --delay 1 --run-id production-8k
+```
+
+Options principales (liste complète avec `--help`) :
+
+| Option | Défaut / comportement |
+|---|---|
+| `--input` | `data/processed/avis_8k_production.csv` ; chemin d'une copie du même jeu si nécessaire |
+| `--api-url` | `http://127.0.0.1:8080` ; aucun credential, query string ou fragment accepté |
+| `--text-column`, `--id-column` | `commentaire`, nom vide ; identifiants lus comme chaînes, sans conversion numérique |
+| `--batch-size` | 16 ; de 1 à 64, au plus 5 000 caractères par avis |
+| `--delay` | 1 seconde entre lots ; pas de concurrence, fréquence approximative 1/(latence + délai) |
+| `--limit` | Aucun ; limiter explicitement le nombre d'avis pour un smoke test |
+| `--shuffle-seed` | Aucun ; ordre CSV par défaut, mélange déterministe avant application de la limite |
+| `--timeout` | 60 secondes par tentative HTTP |
+| `--retries`, `--backoff` | 3 tentatives supplémentaires, délais exponentiels 1/2/4 secondes par défaut, plafonnés à 60 s |
+| `--model-id`, `--n-clusters` | Identifiant logique sélectionné `c93cb37fac6cbebb9f3cce20cb962722c0190a5e588afffbb80f6512eebafab0`, 10 clusters |
+| `--output-root`, `--run-id` | `reports/production_simulation`, identifiant UUID automatique ou nom explicite non existant |
+| `--resume` | Répertoire existant ; tous les paramètres de traitement doivent correspondre au run initial |
+| `--dry-run` | Validation, empreintes et nombres d'avis/lots uniquement ; aucun réseau ni création de fichiers |
+
+Le CSV entier est validé avant de choisir le sous-ensemble : colonnes requises,
+identifiants uniques et non blancs, textes non blancs et limites API. Aucune
+ligne n'est supprimée, aucun avis n'est tronqué. L'empreinte SHA-256 du fichier
+complet est vérifiée avant et après lecture, et l'ordre des identifiants choisis
+possède sa propre empreinte.
+
+Avant d'envoyer des avis, le client exige un `/health` HTTP 200 avec
+`model_ready: true`, avec le même budget borné de retries. Il n'interroge pas
+indéfiniment une API en initialisation. Les erreurs réseau/timeouts et HTTP
+408/429/500/502/503/504 sont réessayées ; les erreurs de validation 4xx restantes
+ne le sont pas. Après épuisement des retries transitoires, le run s'arrête pour
+éviter de poursuivre la charge sur une API indisponible. Un lot rejeté par une
+erreur non transitoire reste enregistré en échec et le traitement peut continuer.
+Une réponse incohérente, un cluster hors limites ou un identifiant modèle différent
+arrête immédiatement le run, sans modèle de secours. Les redirections ne sont
+pas suivies, afin de ne pas transmettre les avis à une autre destination.
+Les corps d'erreur et messages d'exceptions réseau ne sont jamais journalisés.
+
+Chaque nouveau run crée un répertoire privé de résultats, ignoré par Git et
+refusé s'il existe déjà :
+
+```text
+reports/production_simulation/<run-id>/
+  run.json                  # configuration immuable, empreintes, ordre et date UTC
+  requests/health-*.json    # tentatives du contrôle de readiness, sans avis
+  requests/batch-*.json     # checkpoint atomique de chaque lot et ses records
+  sessions/*.json           # temps actif et état de chaque invocation/reprise
+  summary.json              # résumé agrégé, remplacé atomiquement
+```
+
+Les checkpoints de lots contiennent `attempts` (timestamp UTC, latence HTTP,
+statut HTTP ou null, catégorie d'erreur) et `records`, un objet par avis :
+
+- `run_id`, `request_id`, `source_row_id`, `source_row_index` (index CSV à partir de zéro) ;
+- `cluster_id` (null en échec), `model_id` attendu ;
+- `request_timestamp`, `request_latency_seconds`, `attempt_count` ;
+- `success`, `http_status` (null si aucun statut reçu), `error_category` (null en succès).
+
+La latence enregistrée par avis est celle de la **dernière tentative HTTP du lot**,
+répétée avec le même `request_id` pour chaque avis. Elle ne doit pas être interprétée
+comme un temps de calcul individuel ni additionnée une fois par avis. Les autres
+tentatives et leurs latences restent dans l'enveloppe du lot. En cas d'échec,
+`model_id` désigne le modèle attendu, pas une affirmation sur le modèle distant.
+La jointure ultérieure avec le CSV utilise `source_row_id` et l'empreinte du jeu ;
+ne pas joindre simplement sur l'ordre après un mélange.
+
+`summary.json` distingue avis tentés, réussis, échoués, en attente d'un checkpoint
+terminal et pas encore tentés. Il conserve le nombre de requêtes HTTP physiques
+(retries inclus), séparément pour readiness et prédiction, le temps actif cumulé
+des sessions, le débit d'avis réussis, les latences des tentatives de prédiction
+(moyenne, p50/p95 nearest-rank, maximum) et les effectifs par cluster. Le délai
+entre deux invocations n'entre pas dans le débit ; ce n'est pas une moyenne de
+latences individuelles. Le code de sortie est 1 en présence d'erreurs et 130 pour
+une interruption clavier ; les détails structurés restent disponibles sur disque.
+
+Pour reprendre, conserver le répertoire, le fichier CSV et les mêmes paramètres
+(URL, modèle, taille de lot, sous-ensemble, seed, délais et retries). Les
+checkpoints sont vérifiés avant toute requête et une instance concurrente du même
+run est refusée par verrou POSIX. Les lots terminés, réussis **ou échoués**, ne sont
+pas rejoués ; les échecs restent disponibles pour inspection. Les tentatives des
+lots interrompus conservent leur budget de retries. Les lots ne sont pas engagés
+ligne par ligne : écriture temporaire, fsync et remplacement atomique assurent
+des fichiers JSON complets. Ne pas éditer ou supprimer des checkpoints pour
+forcer des retries ; lancer un run distinct si une nouvelle campagne est voulue.
+
+Une coupure entre la réponse HTTP et son checkpoint peut imposer de répéter la
+requête au serveur lors de la reprise : le contrat API n'a pas de clé d'idempotence.
+Cela ne duplique pas les succès déjà enregistrés dans les sorties. De même, une
+requête interrompue avant son checkpoint peut ne pas figurer dans le compteur
+local de requêtes physiques ; Prometheus reste la mesure côté serveur. Le résumé
+est reconstruit à la reprise si un arrêt brutal a empêché sa mise à jour.
+
+Les métriques et dashboards existants observent naturellement `/predict` via
+NGINX ; aucun texte ni prédiction individuelle n'est envoyé à Prometheus. Pour
+des panneaux vides, laisser plusieurs scrapes s'écouler et vérifier le trafic et
+la cible UP. Si l'API est indisponible, consulter le diagnostic du stack dans une
+tâche distincte, puis reprendre le run compatible. Cette phase ne tente ni de
+réparer le timeout Docker ni de démarrer une simulation complète.
+
+```bash
+MLFLOW_DISABLE_AGENT_HINT=1 OPENBLAS_NUM_THREADS=1 OMP_NUM_THREADS=1 \
+  uv run --frozen pytest tests -q
+```
+
+Les tests du client emploient uniquement des CSV synthétiques et un transport
+HTTP simulé. Aucun téléchargement d'encodeur, credential DagsHub ou service
+Docker n'est nécessaire. Aucun Evidently n'est ajouté.
+
 ## Vérifications du pipeline hors ligne
 
 ```bash

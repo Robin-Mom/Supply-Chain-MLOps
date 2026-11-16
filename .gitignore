@@ -73,3 +73,6 @@ notebooks/anaconda_projects/
 # mlflow local tracking
 mlartifacts/
 mlflow.db
+
+# Generated production inference checkpoints and summaries
+/reports/production_simulation/
