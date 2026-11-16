@@ -335,6 +335,14 @@ MLFLOW_DISABLE_AGENT_HINT=1 OPENBLAS_NUM_THREADS=1 OMP_NUM_THREADS=1 \
 
 ## Docker : inférence locale
 
+Le déploiement utilise deux services sur le réseau Compose par défaut :
+`client → 127.0.0.1:8080 → nginx:80 → api:8000`. NGINX résout le nom de service
+`api` avec le DNS Docker ; `localhost` dans NGINX désignerait le proxy lui-même.
+La résolution dynamique permet de retrouver l'API si son adresse change après
+une recréation. Aucune configuration réseau supplémentaire n'est nécessaire.
+Le Dockerfile et la commande Uvicorn restent utilisables comme auparavant ;
+seule l'entrée réseau du déploiement Compose change.
+
 Prérequis : Docker Engine avec BuildKit et Docker Compose v2+, accès au moteur
 Docker, accès réseau aux registres pendant le build et assez d'espace pour les
 dépendances ML verrouillées. Aucun GPU ni environnement Python hôte n'est requis.
@@ -345,6 +353,8 @@ chmod 600 .env.docker.local
 # Renseigner les credentials existants dans ce fichier local, sans les afficher.
 docker compose config -q
 docker compose build api
+# Vérification syntaxique autonome, sans démarrer le modèle :
+docker compose run --rm --no-deps nginx nginx -t
 docker compose up -d --wait --wait-timeout 660
 docker compose ps
 ```
@@ -434,7 +444,8 @@ Le compilateur et uv restent dans le builder ; seul `libgomp1` est ajouté à
 l'étage final avec l'environnement Python construit. La liste de fichiers copiés
 et `.dockerignore` excluent données, modèles, `.venv`, Git et secrets.
 Le processus utilise l'UID/GID 10001, sans capacités Linux supplémentaires,
-avec `no-new-privileges`. Le port hôte est limité à `127.0.0.1:8000`.
+avec `no-new-privileges`. FastAPI reste sur le port 8000 du réseau Compose,
+sans publication sur l’hôte ; seul NGINX publie `127.0.0.1:8080:80`.
 
 Cette première image conserve tout le groupe de dépendances de production du
 projet pour respecter le lock existant. Celui-ci inclut les bibliothèques CUDA
@@ -462,12 +473,14 @@ d'inférence n'est modifié pour cette étape. Les artefacts d'un store local,
 lorsqu'ils sont montés, restent bien sur l'hôte.
 
 ```bash
-curl --fail http://127.0.0.1:8000/health
-curl --fail http://127.0.0.1:8000/model/info
-curl --fail -X POST http://127.0.0.1:8000/predict \
+curl --fail http://127.0.0.1:8080/health
+curl --fail http://127.0.0.1:8080/model/info
+curl --fail http://127.0.0.1:8080/docs
+curl --fail http://127.0.0.1:8080/openapi.json
+curl --fail -X POST http://127.0.0.1:8080/predict \
   -H 'Content-Type: application/json' \
   -d '{"texts":["Livraison rapide et produit conforme","Commande jamais reçue","Service client très réactif"]}'
-docker compose logs --tail=100 api
+docker compose logs --tail=100 api nginx
 docker compose restart api
 docker compose ps
 docker compose stop
@@ -479,6 +492,51 @@ Vérifier aussi `model_id` dans `/model/info` et `/predict`. Toute différence
 d'identité, checksum ou prédiction doit être investiguée ; ne pas choisir un
 autre modèle automatiquement. Le volume Hugging Face est conservé, tandis que
 les deux petits artefacts MLflow sont récupérés depuis DagsHub à chaque démarrage.
+
+NGINX utilise l'image officielle `nginx:1.28.3-alpine`, épinglée par version et digest.
+Sa configuration `nginx/nginx.conf` est montée en lecture seule et transmet
+les chemins, paramètres de requête et réponses FastAPI sans réécriture.
+Swagger UI est accessible à `http://127.0.0.1:8080/docs` et utilise
+`/openapi.json` sur la même origine. Ses ressources JavaScript/CSS externes
+nécessitent un accès Internet depuis le navigateur, comme avec FastAPI seul.
+Les en-têtes `Host` (port inclus), `X-Real-IP`, `X-Forwarded-For` et
+`X-Forwarded-Proto` sont transmis. La limite de corps est de 2 Mio, le délai
+de connexion de 5 secondes et les délais de lecture/envoi de 120 secondes.
+Les réponses d'inférence ne sont pas mises en cache et les requêtes ne sont
+pas rejouées en cas d'erreur upstream. Le numéro de version du serveur est masqué.
+Les access logs contiennent méthode, chemin sans query string, statut, durée
+et adresse cliente, sans corps de requête ni en-tête d'autorisation.
+Seul `api` reçoit `.env.docker.local` ; NGINX ne reçoit aucun credential MLflow.
+
+Les deux services utilisent `restart: unless-stopped`. NGINX attend initialement
+que l'API soit saine (`depends_on: condition: service_healthy`). Son healthcheck
+appelle ensuite `/health` à travers le proxy : si l'API devient indisponible,
+NGINX devient également non sain après les échecs configurés. La condition de
+dépendance n'est pas une surveillance continue et Docker ne redémarre pas un
+conteneur simplement parce qu'il devient non sain. Les réponses 422/503 de
+FastAPI sont transmises telles quelles ; une connexion upstream impossible
+donne typiquement 502 et un délai de réponse dépassé donne 504.
+
+Pour diagnostiquer 502/504 :
+
+```bash
+docker compose ps
+docker compose logs --tail=100 api nginx
+docker compose exec nginx nginx -t
+docker compose exec api python -c "import urllib.request; print(urllib.request.urlopen('http://127.0.0.1:8000/health').read().decode())"
+```
+
+Vérifier le chargement du modèle et les credentials côté API avant d'augmenter
+les timeouts. Après une recréation de l'API, laisser au DNS Docker quelques
+secondes pour actualiser l'adresse. Pour vérifier l'échec upstream localement,
+arrêter seulement `api`, appeler `/health` via le port 8080 et constater 502
+ou 504 selon que la connexion est refusée ou expire,
+puis relancer `docker compose up -d --wait --wait-timeout 660`.
+Les healthchecks continuent à constater l'état réel après le démarrage.
+Une extension future pourrait ajouter TLS au niveau NGINX et une collecte
+de métriques, avec une configuration dédiée ; aucun certificat, domaine public,
+service de monitoring ou endpoint de métriques n'est ajouté ici.
+Les directives proxy suivent la [documentation officielle NGINX](https://nginx.org/en/docs/http/ngx_http_proxy_module.html).
 
 Le healthcheck Python n'exige pas curl dans l'image. Il vérifie HTTP 200 et
 `model_ready: true` sur `/health` toutes les 30 secondes, avec un timeout de

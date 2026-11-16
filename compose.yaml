@@ -5,8 +5,9 @@ services:
       context: .
       target: runtime
     init: true
-    ports:
-      - "127.0.0.1:8000:8000"
+    restart: unless-stopped
+    expose:
+      - "8000"
     # This ignored file is read by Compose, never copied into the image.
     env_file:
       - .env.docker.local
@@ -30,6 +31,31 @@ services:
       - no-new-privileges:true
     cap_drop:
       - ALL
+    stop_grace_period: 30s
+
+  nginx:
+    image: nginx:1.28.3-alpine@sha256:a8b39bd9cf0f83869a2162827a0caf6137ddf759d50a171451b335cecc87d236
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:8080:80"
+    depends_on:
+      api:
+        condition: service_healthy
+    volumes:
+      - type: bind
+        source: ./nginx/nginx.conf
+        target: /etc/nginx/nginx.conf
+        read_only: true
+        bind:
+          create_host_path: false
+    healthcheck:
+      test: ["CMD", "wget", "-q", "-O", "/dev/null", "http://127.0.0.1/health"]
+      interval: 30s
+      timeout: 5s
+      start_period: 15s
+      retries: 3
+    security_opt:
+      - no-new-privileges:true
     stop_grace_period: 30s
 
 volumes:
