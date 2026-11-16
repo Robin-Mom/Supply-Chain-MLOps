@@ -79,3 +79,6 @@ mlflow.db
 
 # Offline statistical monitoring artifacts
 /reports/drift_monitoring/
+
+# Generated end-to-end runtime validation reports
+/reports/integration_validation/
