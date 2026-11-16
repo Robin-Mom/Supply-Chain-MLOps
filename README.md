@@ -260,6 +260,77 @@ optionnelles de stabilité sur les données train. **Le nouveau protocole utilis
 `--params params.yaml` et `select_best.py`** ; les anciennes commandes ne doivent
 pas servir à alimenter sa comparaison des 20 expériences.
 
+## API FastAPI locale
+
+Depuis la racine du dépôt :
+
+```bash
+uv sync --frozen
+uv run --frozen uvicorn api.main:app --app-dir src --host 127.0.0.1 --port 8000
+```
+
+`SUPPLY_CHAIN_SELECTION_PATH` permet de remplacer le chemin par défaut
+`reports/experiment_selection/selection.json`. Ce fichier est un résultat local
+de `select_best.py` et peut être absent de Git : utiliser la sélection déjà
+produite, sans relancer les expériences ni la sélection pour démarrer l'API.
+Les chemins relatifs sont résolus depuis le répertoire courant.
+
+Au démarrage, le lifespan lit cette sélection et configure le tracking avec son
+`tracking_uri` enregistré, puis `ExperimentPredictor.from_mlflow()` télécharge
+son `manifest_uri` et le bundle référencé dans un répertoire temporaire, nettoyé
+à l'arrêt. Aucun run ni artefact distant n'est créé ou modifié. Le checksum,
+l'identifiant logique, la configuration, le run d'entraînement et les
+hyperparamètres de l'estimateur sont vérifiés avant une inférence d'initialisation.
+Cette dernière charge l'encodeur à sa révision Hugging Face figée et vérifie le
+chemin complet de prédiction. Le prétraitement et la normalisation restent ceux
+de `ExperimentPredictor`. Aucun fit n'est appelé.
+
+Les credentials sont lus par `tracking.py` dans `.env.dagshub.local` ou dans les
+variables exportées, prioritaires : `MLFLOW_TRACKING_USERNAME` et
+`MLFLOW_TRACKING_PASSWORD` (ou `DAGSHUB_USER_TOKEN` / `DAGSHUB_CLIENT_TOKEN`).
+`SUPPLY_CHAIN_ENV_FILE` permet de choisir un autre fichier local ignoré. L'URI
+du tracking est celle de la sélection, indépendamment des paramètres de la
+dernière expérience DVC. Ne placer aucun identifiant dans les URI.
+Les poids Hugging Face doivent être en cache ou téléchargeables au démarrage ;
+`HF_HOME` permet de choisir le cache et `HF_HUB_OFFLINE=1` impose son usage hors
+ligne. Le clustering et l'encodeur sont réutilisés entre requêtes. Utiliser un
+seul worker local ; chaque worker supplémentaire chargerait sa propre copie.
+
+```bash
+curl -i http://127.0.0.1:8000/health
+curl http://127.0.0.1:8000/model/info
+curl -X POST http://127.0.0.1:8000/predict \
+  -H 'Content-Type: application/json' \
+  -d '{"texts":["Livraison rapide et produit conforme","Commande jamais reçue"]}'
+```
+
+`/health` distingue la disponibilité de l'application (`status: "ok"`) de celle
+du modèle (`model_ready`). Il répond 200 seulement après initialisation réussie,
+sinon 503. Une initialisation échouée laisse l'application accessible ;
+`/predict` et `/model/info` répondent alors 503. Corriger la sélection, l'accès
+MLflow ou le cache de l'encodeur, puis redémarrer le processus. Aucun modèle de
+secours n'est choisi. Les erreurs d'exécution donnent une réponse 500 générique,
+sans trace interne. Les journaux d'échec évitent aussi le contenu des exceptions
+distantes, qui pourrait contenir des secrets.
+
+`/predict` accepte de 1 à 64 chaînes de 1 à 5 000 caractères chacune, rejette
+les avis blancs et les champs supplémentaires (422), et conserve l'ordre des
+avis. Les accès concurrents à l'encodeur partagé sont sérialisés. Les textes ne
+sont ni journalisés ni conservés par l'application. `/model/info` expose seulement
+l'identifiant logique, l'encodeur et sa révision, la méthode, la seed et la
+version du prétraitement. La documentation interactive est disponible à `/docs`.
+Ce service est destiné à un usage local, sans authentification ni déploiement.
+
+Tests API hors ligne (transport MLflow et encodeur simulés, sans credentials ni
+poids réels) et régression complète :
+
+```bash
+MLFLOW_DISABLE_AGENT_HINT=1 OPENBLAS_NUM_THREADS=1 OMP_NUM_THREADS=1 \
+  uv run --frozen pytest tests/test_api.py -q
+MLFLOW_DISABLE_AGENT_HINT=1 OPENBLAS_NUM_THREADS=1 OMP_NUM_THREADS=1 \
+  uv run --frozen pytest tests -q
+```
+
 ## Vérifications hors ligne
 
 ```bash
