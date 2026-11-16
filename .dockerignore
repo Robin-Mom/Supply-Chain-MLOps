@@ -9,6 +9,7 @@
 !src/api/
 !src/api/__init__.py
 !src/api/main.py
+!src/api/metrics.py
 !src/predict.py
 !src/train.py
 !src/experiment.py

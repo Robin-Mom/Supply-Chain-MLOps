@@ -335,13 +335,15 @@ MLFLOW_DISABLE_AGENT_HINT=1 OPENBLAS_NUM_THREADS=1 OMP_NUM_THREADS=1 \
 
 ## Docker : inférence locale
 
-Le déploiement utilise deux services sur le réseau Compose par défaut :
+Le déploiement utilise trois services sur le réseau Compose par défaut :
 `client → 127.0.0.1:8080 → nginx:80 → api:8000`. NGINX résout le nom de service
 `api` avec le DNS Docker ; `localhost` dans NGINX désignerait le proxy lui-même.
 La résolution dynamique permet de retrouver l'API si son adresse change après
 une recréation. Aucune configuration réseau supplémentaire n'est nécessaire.
 Le Dockerfile et la commande Uvicorn restent utilisables comme auparavant ;
 seule l'entrée réseau du déploiement Compose change.
+Prometheus collecte directement `api:8000/metrics`, indépendamment de NGINX,
+et publie son interface uniquement sur `127.0.0.1:9090`.
 
 Prérequis : Docker Engine avec BuildKit et Docker Compose v2+, accès au moteur
 Docker, accès réseau aux registres pendant le build et assez d'espace pour les
@@ -508,7 +510,7 @@ Les access logs contiennent méthode, chemin sans query string, statut, durée
 et adresse cliente, sans corps de requête ni en-tête d'autorisation.
 Seul `api` reçoit `.env.docker.local` ; NGINX ne reçoit aucun credential MLflow.
 
-Les deux services utilisent `restart: unless-stopped`. NGINX attend initialement
+Les trois services utilisent `restart: unless-stopped`. NGINX attend initialement
 que l'API soit saine (`depends_on: condition: service_healthy`). Son healthcheck
 appelle ensuite `/health` à travers le proxy : si l'API devient indisponible,
 NGINX devient également non sain après les échecs configurés. La condition de
@@ -533,9 +535,9 @@ arrêter seulement `api`, appeler `/health` via le port 8080 et constater 502
 ou 504 selon que la connexion est refusée ou expire,
 puis relancer `docker compose up -d --wait --wait-timeout 660`.
 Les healthchecks continuent à constater l'état réel après le démarrage.
-Une extension future pourrait ajouter TLS au niveau NGINX et une collecte
-de métriques, avec une configuration dédiée ; aucun certificat, domaine public,
-service de monitoring ou endpoint de métriques n'est ajouté ici.
+Une extension future pourrait ajouter TLS au niveau NGINX avec une configuration
+dédiée ; aucun certificat ni domaine public n'est ajouté ici. La collecte
+Prometheus interne est décrite dans la section monitoring ci-dessous.
 Les directives proxy suivent la [documentation officielle NGINX](https://nginx.org/en/docs/http/ngx_http_proxy_module.html).
 
 Le healthcheck Python n'exige pas curl dans l'image. Il vérifie HTTP 200 et
@@ -555,13 +557,125 @@ l'UID 10001 ; les volumes Docker nommés utilisent les permissions de l'image.
 `docker compose down --volumes` supprime le cache et impose de télécharger les
 poids à nouveau : ne l'utiliser que pour une remise à zéro volontaire.
 
-Les tests Python restent exécutables avec la commande de la section précédente ;
-pytest n'est pas installé dans l'image de production. La syntaxe Compose,
+Les tests Python restent exécutables avec la commande de la section précédente.
+La syntaxe Compose,
 le build et les appels réels ci-dessus constituent les vérifications Docker.
 La construction suit le [guide Docker de uv](https://docs.astral.sh/uv/guides/integration/docker/)
 et les montages la [référence Compose](https://docs.docker.com/reference/compose-file/services/).
 
-## Vérifications hors ligne
+## Monitoring opérationnel : Prometheus
+
+```bash
+docker compose config -q
+docker compose build api
+docker compose run --rm --no-deps nginx nginx -t
+docker compose run --rm --no-deps --entrypoint promtool prometheus \
+  check config /etc/prometheus/prometheus.yml
+docker compose up -d --wait --wait-timeout 660
+docker compose logs --tail=100 api nginx prometheus
+```
+
+L'interface est disponible sur `http://127.0.0.1:9090`. Vérifier les cibles dans
+la page **Status → Target health**, ou via `http://127.0.0.1:9090/api/v1/targets` :
+le job `fastapi` doit être UP et son URL `http://api:8000/metrics`. La collecte
+est définie dans `monitoring/prometheus/prometheus.yml` : intervalle 15 secondes,
+timeout 5 secondes. Elle ne dépend pas du proxy et continue à tenter les scrapes
+si le modèle ou NGINX est indisponible. Le healthcheck Prometheus vérifie son
+endpoint `/-/ready` ; il ne garantit pas que chaque cible est UP.
+L'image officielle `prom/prometheus:v3.5.0` est épinglée par version et digest.
+
+L'instrumentation utilise la [bibliothèque officielle prometheus-client](https://prometheus.github.io/client_python/registry/)
+avec un registre par application, sans collecteurs globaux ni métadonnées du
+modèle. Le middleware ASGI conserve les réponses et compte les erreurs aussi.
+Un seul processus Uvicorn est pris en charge ; pour plusieurs workers, il faudra
+une configuration multiprocess dédiée. Les compteurs de l'API repartent de zéro
+au redémarrage de son processus ; `rate()` gère ces resets.
+
+| Métrique | Type | Labels / signification |
+|---|---|---|
+| `http_requests_total` | Counter | `method`, `route`, `status_code` ; requêtes terminées, y compris erreurs |
+| `http_request_duration_seconds` | Histogram | mêmes labels ; durée complète, files d'attente et inférence comprises |
+| `http_requests_in_progress` | Gauge | `method` ; requêtes actives, décrémentées même en cas d'exception |
+| `model_ready` | Gauge | sans label ; 1 si le prédicteur est initialisé, 0 sinon |
+
+Les buckets de latence vont de 5 ms à 300 secondes, plus `+Inf`. Les labels de
+route utilisent les templates du routeur ; les chemins inconnus sont regroupés
+sous `__unmatched__`. Les méthodes inconnues sont regroupées sous `OTHER`.
+Les labels ne contiennent ni texte d'avis, URL brute, query string, credential,
+identifiant individuel, embedding ou prédiction. La readiness lit seulement
+l'état existant du prédicteur : aucun téléchargement ni contrôle coûteux au scrape.
+Les scrapes `/metrics` et leur redirection avec slash final sont exclus des
+compteurs, histogrammes et jauges HTTP, pour éviter la récursion et le bruit.
+Les healthchecks `/health` sont comptés ; filtrer `route="/predict"` pour étudier
+l'inférence. Les requêtes rejetées par NGINX (403/413) ne touchent pas FastAPI
+et ne figurent donc pas dans ces métriques.
+
+PromQL utile, avec quelques minutes de trafic pour les fenêtres de 5 minutes :
+
+```promql
+# Débit d'inférence (requêtes/s)
+sum(rate(http_requests_total{job="fastapi",route="/predict"}[5m]))
+
+# Fraction d'erreurs serveur d'inférence ; sans trafic le ratio peut être NaN
+sum(rate(http_requests_total{job="fastapi",route="/predict",status_code=~"5.."}[5m]))
+/
+sum(rate(http_requests_total{job="fastapi",route="/predict"}[5m]))
+
+# Latence p95 d'inférence (secondes)
+histogram_quantile(0.95,
+  sum by (le) (rate(http_request_duration_seconds_bucket{job="fastapi",route="/predict"}[5m])))
+
+# Disponibilité de la collecte et du modèle : deux notions distinctes
+up{job="fastapi"}
+model_ready{job="fastapi"}
+```
+
+NGINX bloque `/metrics` avec HTTP 403, y compris variantes de casse, slash final,
+suffixes, query strings et chemins normalisés/encodés. FastAPI n'a toujours aucun
+port publié. Prometheus et NGINX n'ont ni fichier d'environnement de credentials
+ni montage des artefacts. Les données sont accessibles aux services du réseau
+Compose et à l'utilisateur local via l'UI Prometheus, sans authentification.
+
+```bash
+curl -i http://127.0.0.1:8080/metrics
+curl -i http://127.0.0.1:8080/metrics/
+curl -i --path-as-is http://127.0.0.1:8080/%6detrics
+# Vérification interne, sans passer par NGINX :
+docker compose exec prometheus wget -q -O - http://api:8000/metrics
+```
+
+Le volume nommé `prometheus-data` conserve la TSDB sur `/prometheus` avec une
+rétention de 15 jours. Il survit aux redémarrages/recréations et à
+`docker compose down`. Les nouveaux volumes héritent des permissions de l'image.
+Conserver le même nom de projet Compose pour retrouver les mêmes volumes.
+`docker compose down --volumes` supprimerait les données et le cache Hugging Face.
+Si 9090 est occupé, ne pas arrêter un service tiers ; résoudre le conflit avant
+de démarrer ce stack. La configuration suit la [documentation Prometheus](https://prometheus.io/docs/prometheus/latest/configuration/configuration/).
+
+Tests hors ligne :
+
+```bash
+MLFLOW_DISABLE_AGENT_HINT=1 OPENBLAS_NUM_THREADS=1 OMP_NUM_THREADS=1 \
+  uv run --frozen pytest tests -q
+```
+
+Les tests d'intégration sont ignorés par défaut. Une fois le stack explicitement
+démarré et prêt, ils vérifient les variantes bloquées par NGINX, la cible UP,
+les incréments observés après un scrape et les trois prédictions de référence :
+
+```bash
+RUN_MONITORING_INTEGRATION=1 uv run --frozen pytest tests/integration/test_monitoring_stack.py -q
+docker compose restart prometheus
+docker compose up -d --wait --wait-timeout 660
+docker compose down
+```
+
+Ces métriques décrivent le fonctionnement du service, pas la qualité sémantique
+des clusters, la dérive des données ou la pertinence des prédictions. Aucun jeu
+de simulation, référence monitoring ou test final n'est utilisé. Grafana,
+Evidently, alertes et simulation restent hors de cette phase.
+
+## Vérifications du pipeline hors ligne
 
 ```bash
 MLFLOW_DISABLE_AGENT_HINT=1 OPENBLAS_NUM_THREADS=1 OMP_NUM_THREADS=1 \

@@ -9,12 +9,14 @@ from threading import Lock
 from typing import Annotated
 
 from fastapi import FastAPI, HTTPException
-from fastapi.responses import JSONResponse
+from fastapi.responses import JSONResponse, Response
+from prometheus_client import CONTENT_TYPE_LATEST, generate_latest
 from pydantic import BaseModel, ConfigDict, Field, StringConstraints, field_validator
 
 from experiment import PREPROCESSING, digest, read_json
 from predict import ExperimentPredictor
 from tracking import configure_tracking, load_tracking_environment
+from api.metrics import HTTPMetricsMiddleware, Metrics
 
 logger = logging.getLogger(__name__)
 UNAVAILABLE = "Selected model unavailable; check selection, tracking access and encoder cache."
@@ -116,7 +118,15 @@ def create_app(*, selection_path=None, loader=None):
     app = FastAPI(title="Selected review clustering model", lifespan=lifespan)
     app.state.predictor = None
     app.state.info = None
+    metrics = Metrics(lambda: float(app.state.predictor is not None))
+    app.state.metrics = metrics
+    app.add_middleware(HTTPMetricsMiddleware, metrics=metrics)
     prediction_lock = Lock()
+
+    @app.get("/metrics", include_in_schema=False)
+    def prometheus_metrics():
+        return Response(content=generate_latest(metrics.registry),
+                        headers={"Content-Type": CONTENT_TYPE_LATEST})
 
     def require_model():
         if app.state.predictor is None:
