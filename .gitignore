@@ -1,6 +1,7 @@
 # Python-generated files
 __pycache__/
 *.py[oc]
+*.py[cod]
 build/
 dist/
 wheels/
@@ -11,12 +12,9 @@ wheels/
 .ml
 
 # --- CONFIGURATION DATA (GIT + DVC) ---
-# On ignore le contenu du dossier data
-data/*
-# Sauf les fichiers de configuration et de tracking DVC
-!data/.gitkeep
-!data/*.dvc
-!data/.gitignore
+/data/raw/
+/data/processed/
+/data/train_eval/
 
 # --- CONFIGURATION MODELS ---
 models/*
@@ -29,6 +27,10 @@ models/*
 !.vscode/settings.json
 .env
 .streamlit/secrets.toml
+.env.*
+.env.dagshub.local
+!.env.example
+
 
 # Logs du pipeline (On ne les push pas sur Git)
 logs/
@@ -37,8 +39,6 @@ logs/
 .dvc/config.local
 .dvc/cache/
 .dvc/tmp/
-.dvc/config*
-
 
 # ======================
 # Nginx - Certificats SSL
@@ -65,5 +65,30 @@ dockers/nginx/.htpasswd.*
 # ======================
 ddu/*
 
-# others
-/draft.odt
+# Jupyter
+.ipynb_checkpoints/
+.virtual_documents/
+notebooks/anaconda_projects/
+
+# mlflow local tracking
+mlartifacts/
+mlflow.db
+
+# Generated production inference checkpoints and summaries
+/reports/production_simulation/
+
+# Offline statistical monitoring artifacts
+/reports/drift_monitoring/
+
+# Generated end-to-end runtime validation reports
+/reports/integration_validation/
+
+# Independent frozen-model final evaluation artifacts
+/reports/final_evaluation/
+
+# Local tracking stores and generated runtime evidence (never public source)
+/mlruns/
+/metrics/
+/reports/
+/mlflow.db-*
+/mlflow.db-journal

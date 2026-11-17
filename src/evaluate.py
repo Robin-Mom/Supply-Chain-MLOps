@@ -1,100 +1,332 @@
-#!/usr/bin/env python3
-# -*- coding: utf-8 -*-
+"""Evaluate geometry, c-TF-IDF keywords and clustering stability.
+
+Default evaluation uses saved training embeddings and labels. --input evaluates
+new reviews with a frozen KMeans or Spherical KMeans model. Stability explicitly refits models and
+is restricted to the training data; it is opt-in because it can be expensive.
+"""
+from __future__ import annotations
 
 import argparse
-import logging as log
 import json
-import os
-import dagshub
-import mlflow
+import re
+from itertools import combinations
+from pathlib import Path
+from time import perf_counter
+
 import numpy as np
 import pandas as pd
+from sklearn.metrics import silhouette_score, davies_bouldin_score, adjusted_rand_score
 
-from mlflow.tracking import MlflowClient
-from sklearn.metrics import silhouette_score
-from prometheus_client import CollectorRegistry, Gauge, push_to_gateway
+from train import METHODS, fit_clustering, load_reviews, write_json
+from tracking import configure_tracking
 
-def push_metrics(score):
-    """Envoie le score de silhouette au PushGateway Prometheus"""
+
+def evaluate_clustering(X, labels, sample_size=5000, seed=42, metric="cosine"):
+    """Score non-noise observations; report undefined scores as JSON null.
+
+    sample_size=0 computes an exact silhouette. The default uses at most 5000
+    assigned observations; all other statistics use every assigned observation.
+    """
+    X, labels = np.asarray(X), np.asarray(labels)
+    if X.ndim != 2 or len(X) == 0 or labels.shape != (len(X),):
+        raise ValueError("Expected a non-empty matrix and one label per row.")
+    if not np.isfinite(X).all() or sample_size < 0:
+        raise ValueError("Embeddings must be finite and sample_size nonnegative.")
+    assigned = labels >= 0
+    valid_X, valid_y = X[assigned], labels[assigned]
+    unique, counts = np.unique(valid_y, return_counts=True)
+    results = {"n_samples": len(X), "n_clusters": len(unique),
+               "coverage": float(assigned.mean()), "noise_ratio": float(1-assigned.mean()),
+               "largest_cluster_ratio": float(counts.max()/len(valid_y)) if len(counts) else None,
+               "davies_bouldin": None, f"silhouette_{metric}": None,
+               "silhouette_n_samples": 0}
+    if not 2 <= len(unique) < len(valid_y):
+        return results
+    results["davies_bouldin"] = float(davies_bouldin_score(valid_X, valid_y))
+    idx = np.arange(len(valid_y))
+    if sample_size and len(idx) > sample_size:
+        idx = np.random.default_rng(seed).choice(idx, sample_size, replace=False)
+    results["silhouette_n_samples"] = len(idx)
+    if 2 <= len(np.unique(valid_y[idx])) < len(idx):
+        results[f"silhouette_{metric}"] = float(silhouette_score(valid_X[idx], valid_y[idx], metric=metric))
+    return results
+
+
+def name_clustering(texts, labels, top_n=10):
+    """Extract French unigram/bigram keywords using the notebook's c-TF-IDF."""
+    from bertopic.vectorizers import ClassTfidfTransformer
+    from scipy.sparse import csr_matrix
+    from sklearn.feature_extraction.text import CountVectorizer
+    from spacy.lang.fr.stop_words import STOP_WORDS
+    columns = ["cluster", "rank", "term", "score_ctfidf"]
+    df = pd.DataFrame({"text": texts, "cluster": labels})
+    df["text"] = df["text"].fillna("").astype(str).str.strip()
+    df = df[(df.cluster >= 0) & df.text.ne("")].reset_index(drop=True)
+    if df.empty:
+        return pd.DataFrame(columns=columns)
+    stop_words = sorted({token for word in STOP_WORDS
+                         for token in re.findall(r"(?u)\b\w\w+\b", word.lower())})
+    vectorizer = CountVectorizer(stop_words=stop_words, ngram_range=(1, 2), min_df=1)
     try:
-        registry = CollectorRegistry()
-        g = Gauge("model_silhouette_score", "Silhouette score du modèle", registry=registry)
-        g.set(float(score))
-        push_to_gateway("pushgateway:9091", job="evaluate_pipeline", registry=registry)
-        log.info("Metrics pushed to Prometheus successfully")
-    except Exception as e:
-        log.warning(f"Could not push metrics to Prometheus: {e}")
+        X_docs = vectorizer.fit_transform(df.text)
+    except ValueError as error:
+        if "empty vocabulary" in str(error):
+            return pd.DataFrame(columns=columns)
+        raise
+    cluster_labels, cluster_ids = np.unique(df.cluster, return_inverse=True)
+    membership = csr_matrix((np.ones(len(df)), (cluster_ids, np.arange(len(df)))),
+                            shape=(len(cluster_labels), len(df)))
+    X_ctfidf = ClassTfidfTransformer().fit_transform(membership @ X_docs).tocsr()
+    vocabulary = vectorizer.get_feature_names_out()
+    rows = []
+    for i, cluster_id in enumerate(cluster_labels):
+        row = X_ctfidf.getrow(i)
+        for rank, pos in enumerate(np.argsort(row.data)[::-1][:top_n], start=1):
+            rows.append({"cluster": int(cluster_id), "rank": rank,
+                         "term": vocabulary[row.indices[pos]], "score_ctfidf": float(row.data[pos])})
+    return pd.DataFrame(rows, columns=columns)
 
-def main(args):
-    # Initialisation
-    dagshub.init(repo_owner='schmilblick-ai', repo_name='Supply-Chain-MLOps', mlflow=True)
-    
-    with open(args['run_id_file'], "r") as f:
-        run_id = f.read().strip()
 
-    df = pd.read_csv(args['filepath'], sep=args['sep'])
-    mask = df[args['col_topics']] != -1
-    
-    X = np.vstack(df.loc[mask, args['col_embs']].apply(lambda x: np.fromstring(x.strip("[]"), sep=" ")).values)
-    labels = df.loc[mask, args['col_topics']].values
+def compare_partitions(a, b):
+    """Report ARI with noise as one label, plus ARI excluding noise in either run."""
+    common_assigned = (a >= 0) & (b >= 0)
+    return {"ari": float(adjusted_rand_score(a, b)) if len(a) >= 2 else None,
+            "ari_assigned_only": float(adjusted_rand_score(a[common_assigned], b[common_assigned]))
+            if common_assigned.sum() >= 2 else None,
+            "n_common": len(a), "n_common_assigned": int(common_assigned.sum())}
 
-    if len(set(labels)) < 2:
-        raise ValueError("Need at least 2 clusters to compute silhouette score")
 
-    score = silhouette_score(X, labels, metric="cosine")
-    
-    # Sauvegarde locale métrique
-    os.makedirs(os.path.dirname(args['metrics_output']), exist_ok=True)
-    with open(args['metrics_output'], "w") as f:
-        json.dump({"silhouette_score": float(score)}, f, indent=4)
+def evaluate_stability(X, method, config, mode="statistical", n_repeats=10,
+                       sample_fraction=0.8, seed=42):
+    """Compare partitions with fixed seeds, varying seeds or both resampling and seeds.
 
-    # MLflow Tracking
-    with mlflow.start_run(run_id=run_id):
-        mlflow.log_metric("silhouette_score", float(score))
-
-    # Promotion Logique
-    client = MlflowClient()
-    runs = mlflow.search_runs(experiment_names=[args['experiment_name']])
-    best_score = runs["metrics.silhouette_score"].max() if "metrics.silhouette_score" in runs.columns else -1
-
-    if score >= best_score:
-        artifact_uri = mlflow.get_artifact_uri(args['artifact_path'])
-        
-        try:
-            client.create_registered_model(args['model_name'])
-        except:
-            pass
-        
-        # Création et Promotion
-        result = client.create_model_version(name=args['model_name'], source=artifact_uri, run_id=run_id)
-        client.transition_model_version_stage(name=args['model_name'], version=result.version, stage="Production")
-        
-        # Archive les anciennes versions Production
-        versions = client.search_model_versions(f"name='{args['model_name']}'")
-        for v in versions:
-            if v.stage == "Production" and v.version != result.version:
-                client.transition_model_version_stage(name=args['model_name'], version=v.version, stage="Archived")
-
-        log.info(f"New best model registered: {score}")
-        
-        # Envoi métrique vers Prometheus
-        push_metrics(score)
+    statistical: independent subsets, identical seed.
+    algorithmic: identical full data, varying seed, all pairs compared.
+    global: independent subsets and varying seed.
+    Noise (-1) is treated as a cluster in `ari`, matching the notebook.
+    """
+    if mode not in {"statistical", "algorithmic", "global"}:
+        raise ValueError("Unknown stability mode.")
+    if n_repeats < 2 or not 0 < sample_fraction <= 1:
+        raise ValueError("Use at least two repeats and 0 < sample_fraction <= 1.")
+    def run(data, run_seed):
+        print(f"Stability: {method}, {mode}, shape={data.shape}, seed={run_seed}", flush=True)
+        return fit_clustering(data, method, config, run_seed)[2]
+    rows = []
+    if mode == "algorithmic":
+        partitions = [run(X, seed+i) for i in range(n_repeats)]
+        for i, j in combinations(range(n_repeats), 2):
+            rows.append({"repeat_a": i, "repeat_b": j, **compare_partitions(partitions[i], partitions[j])})
     else:
-        log.info(f"Model not promoted. Score={score}, Best={best_score}")
+        size = int(len(X)*sample_fraction)
+        if size < 2:
+            raise ValueError("Subsets must contain at least two observations.")
+        rng = np.random.default_rng(seed)
+        for i in range(n_repeats):
+            idx_a = np.sort(rng.choice(len(X), size, replace=False))
+            idx_b = np.sort(rng.choice(len(X), size, replace=False))
+            _, pos_a, pos_b = np.intersect1d(idx_a, idx_b, return_indices=True)
+            seed_a = seed if mode == "statistical" else seed+2*i
+            seed_b = seed if mode == "statistical" else seed+2*i+1
+            a, b = run(X[idx_a], seed_a), run(X[idx_b], seed_b)
+            rows.append({"repeat_a": i, "repeat_b": i, **compare_partitions(a[pos_a], b[pos_b])})
+    return pd.DataFrame(rows).assign(method=method, mode=mode)
 
-def _cli():
-    parser = argparse.ArgumentParser()
-    parser.add_argument("-f", "--filepath", default="models/artifacts/clusterized.csv")
-    parser.add_argument("-ct", "--col_topics", default="meta_topic")
-    parser.add_argument("-ce", "--col_embs", default="embedding")
-    parser.add_argument("-mo", "--metrics_output", default="metrics/silhouette.json")
-    parser.add_argument("-ri", "--run_id_file", default="models/last_run_id.txt")
-    parser.add_argument("-en", "--experiment_name", default="Bertopic_Trustpilot_v4")
-    parser.add_argument("-mn", "--model_name", default="trustpilot_bertopic_v4")
-    parser.add_argument("-ap", "--artifact_path", default="model")
-    # Ajout de l'argument sep manquant
-    parser.add_argument("-sep", "--sep", default=",", help="Separator for CSV") 
-    return vars(parser.parse_args())
+
+def main(argv=None):
+    """Write metric JSON, keyword CSV and optional stability CSV/boxplots."""
+    import sys
+    arguments = list(sys.argv[1:] if argv is None else argv)
+    if "--params" in arguments:
+        from experiment import load_params
+        parser = argparse.ArgumentParser()
+        parser.add_argument("--params", required=True)
+        return evaluate_experiment(load_params(parser.parse_args(arguments).params))
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("--artifact-dir", type=Path, required=True)
+    parser.add_argument("--output-dir", type=Path, required=True)
+    parser.add_argument("--metrics-output", type=Path, help="Optional combined JSON metrics for DVC.")
+    parser.add_argument("--methods", nargs="+", choices=METHODS)
+    parser.add_argument("--input", type=Path, help="Optional held-out CSV evaluated with the saved models.")
+    parser.add_argument("--text-column", default="commentaire")
+    parser.add_argument("--device")
+    parser.add_argument("--batch-size", type=int, default=32)
+    parser.add_argument("--silhouette-sample-size", type=int, default=5000, help="0 means exact silhouette.")
+    parser.add_argument("--skip-keywords", action="store_true")
+    parser.add_argument("--stability", nargs="+", choices=("statistical", "algorithmic", "global"), default=[])
+    parser.add_argument("--n-repeats", type=int, default=10)
+    parser.add_argument("--sample-fraction", type=float, default=0.8)
+    parser.add_argument("--seed", type=int, default=42)
+    parser.add_argument("--plot", action="store_true")
+    parser.add_argument("--log-mlflow", action="store_true", help="Append evaluation to recorded training runs.")
+    args = parser.parse_args(argv)
+    metadata = json.loads((args.artifact_dir / "metadata.json").read_text())
+    methods = list(dict.fromkeys(args.methods or metadata["methods"]))
+    if any(m not in METHODS for m in methods):
+        parser.error(f"Supported methods are: {METHODS}.")
+    if any(m not in metadata["methods"] for m in methods):
+        parser.error("One or more requested methods were not trained.")
+    if args.output_dir.exists():
+        parser.error("Output directory already exists; choose a new directory.")
+    if args.metrics_output and args.metrics_output.exists():
+        parser.error("Metrics file already exists; choose a new path.")
+    if args.input and args.stability:
+        parser.error("Stability refitting is restricted to training data.")
+    if args.silhouette_sample_size < 0 or args.batch_size < 1:
+        parser.error("Invalid sample size or batch size.")
+    if args.stability and (args.n_repeats < 2 or not 0 < args.sample_fraction <= 1):
+        parser.error("Stability requires n-repeats >= 2 and 0 < sample-fraction <= 1.")
+    runs = {}
+    if args.log_mlflow:
+        for method in methods:
+            info_path = args.artifact_dir / method / "mlflow_run.json"
+            if not info_path.exists():
+                parser.error("No recorded MLflow run. Enable tracking during training first.")
+            runs[method] = json.loads(info_path.read_text())
+            try:
+                configure_tracking(runs[method]["tracking_uri"])
+            except ValueError as error:
+                parser.error(str(error))
+            import mlflow
+            recorded = mlflow.MlflowClient().get_run(runs[method]["run_id"])
+            expected = runs[method].get("experiment_id")
+            if expected is not None and str(expected) != recorded.info.experiment_id:
+                parser.error(f"{method}: recorded run belongs to a different experiment.")
+    if args.input:
+        from predict import predict_reviews, load_bundle, predict_embeddings
+        _, texts = load_reviews(args.input, args.text_column)
+        _, X = predict_reviews(args.artifact_dir, methods[0], texts, args.device, args.batch_size)
+    else:
+        X = np.load(args.artifact_dir / "embeddings.npy", allow_pickle=False)
+        texts = pd.read_csv(args.artifact_dir / "texts.csv")["text"].to_numpy()
+    args.output_dir.mkdir(parents=True)
+    combined_metrics = {}
+    for method in methods:
+        directory = args.output_dir / method
+        directory.mkdir()
+        source = args.artifact_dir / method
+        labels = predict_embeddings(load_bundle(args.artifact_dir, method), X) if args.input else np.load(source / "labels.npy", allow_pickle=False)
+        metrics = evaluate_clustering(X, labels, args.silhouette_sample_size, args.seed)
+        combined_metrics[method] = metrics
+        write_json(directory / "metrics.json", metrics)
+        write_json(directory / "evaluation_config.json", {"dataset": "held_out" if args.input else "training",
+                   "input": str(args.input) if args.input else None, "seed": args.seed,
+                   "silhouette_sample_size": args.silhouette_sample_size, "n_repeats": args.n_repeats,
+                   "sample_fraction": args.sample_fraction, "stability": args.stability})
+        pd.DataFrame({"text": texts, "cluster_id": labels}).to_csv(directory / "assignments.csv", index=False)
+        if not args.skip_keywords:
+            name_clustering(texts, labels).to_csv(directory / "keywords.csv", index=False)
+        for mode in dict.fromkeys(args.stability):
+            start = perf_counter()
+            results = evaluate_stability(X, method, metadata["config"], mode, args.n_repeats, args.sample_fraction, args.seed)
+            results.to_csv(directory / f"stability_{mode}.csv", index=False)
+            write_json(directory / f"stability_{mode}_timing.json", {"seconds": perf_counter()-start})
+            if args.plot:
+                import matplotlib
+                matplotlib.use("Agg")
+                import matplotlib.pyplot as plt
+                valid = results["ari"].dropna()
+                if not valid.empty:
+                    fig, ax = plt.subplots(figsize=(6, 4))
+                    ax.boxplot(valid.to_numpy())
+                    ax.set_title(f"{method}: {mode} stability")
+                    ax.set_ylabel("Adjusted Rand Index (including noise)")
+                    fig.tight_layout()
+                    fig.savefig(directory / f"stability_{mode}.png", dpi=150)
+                    plt.close(fig)
+        if args.log_mlflow:
+            import mlflow
+            info = runs[method]
+            configure_tracking(info["tracking_uri"])
+            recorded = mlflow.MlflowClient().get_run(info["run_id"])
+            mlflow.set_experiment(experiment_id=recorded.info.experiment_id)
+            prefix = "held_out" if args.input else "training"
+            with mlflow.start_run(run_id=info["run_id"]):
+                mlflow.set_tags({"mlflow.runType": "training", "mlflow.runSourceType": "training"})
+                print(f"MLflow evaluation: method={method}, run_id={info['run_id']}, "
+                      f"experiment_id={mlflow.active_run().info.experiment_id}", flush=True)
+                mlflow.log_metrics({f"{prefix}_{k}": v for k, v in metrics.items() if v is not None})
+                mlflow.log_artifacts(str(directory), artifact_path=f"evaluation/{prefix}/{args.output_dir.name}")
+        print(f"{method}: {json.dumps(metrics)}", flush=True)
+    if args.metrics_output:
+        args.metrics_output.parent.mkdir(parents=True, exist_ok=True)
+        write_json(args.metrics_output, combined_metrics)
+
+
+def held_out_silhouette(X, labels, config):
+    """Use the same deterministic positions for every configuration, in chunks."""
+    from sklearn import config_context
+    count = config["sample_size"]
+    indices = np.arange(len(X))
+    if count and count < len(X):
+        indices = np.sort(np.random.default_rng(config["sample_seed"]).choice(len(X), count, replace=False))
+    y = np.asarray(labels)[indices]
+    from experiment import digest
+    result = {"silhouette_cosine": None, "silhouette_n_samples": len(indices),
+              "sample_indices_sha256": digest(indices.tolist()), "undefined_reason": None}
+    if not 2 <= len(np.unique(y)) < len(y):
+        result["undefined_reason"] = "Silhouette requires 2 through n_samples-1 represented clusters."
+        return result
+    with config_context(working_memory=config["working_memory_mb"]):
+        result["silhouette_cosine"] = float(silhouette_score(X[indices], y, metric="cosine"))
+    return result
+
+
+def evaluate_experiment(params):
+    import mlflow
+    from experiment import (checked_manifest, digest, evaluation_dir, file_hash, load_embeddings,
+                            prediction_dir, read_json, run_dir, start_run, sweep_id, write_json)
+    manifest = checked_manifest(params)
+    predicted = read_json(prediction_dir(params) / "manifest.json")
+    X, cache = load_embeddings(params, params["experiment"]["encoder"], "eval")
+    if (predicted["logical_id"] != manifest["logical_id"]
+            or predicted["train_mlflow_run_id"] != manifest["mlflow_run_id"]
+            or predicted["eval_cache_id"] != cache["cache_id"]
+            or predicted["eval_embedding_sha256"] != cache["sha256"]
+            or file_hash(predicted["predictions_path"]) != predicted["predictions_sha256"]):
+        raise ValueError("Prediction provenance mismatch.")
+    frame = pd.read_csv(predicted["predictions_path"], dtype={"observation_id": str})
+    if (frame.observation_id.tolist() != cache["observation_ids"]
+            or not frame.logical_id.eq(manifest["logical_id"]).all()):
+        raise ValueError("Prediction observation alignment mismatch.")
+    labels = frame.cluster_id.to_numpy()
+    if not np.issubdtype(labels.dtype, np.integer) or (labels < 0).any():
+        raise ValueError("Invalid cluster assignments.")
+    metrics = held_out_silhouette(X, labels, params["evaluation"])
+    # Keep the training objective beside held-out quality in the comparison UI.
+    metrics["inertia"] = read_json(run_dir(params) / "training_metrics.json")["inertia"]
+    directory = evaluation_dir(params)
+    # DVC creates output parents before executing the stage.
+    if (directory / "result.json").exists() or (directory / "metrics.json").exists():
+        raise FileExistsError("Evaluation outputs already exist; let DVC manage reproduction.")
+    directory.mkdir(parents=True, exist_ok=True)
+    with start_run(params, "eval", manifest["logical_id"], {
+            "train_mlflow_run_id": manifest["mlflow_run_id"],
+            "dvc_experiment_name": manifest["provenance"]["dvc_experiment_name"] or "standalone"}) as run:
+        result = {"logical_id": manifest["logical_id"], "sweep_id": sweep_id(params),
+                  "configuration": manifest["configuration"], "metrics": metrics,
+                  "evaluation_config": params["evaluation"], "eval_input_sha256": cache["spec"]["input_sha256"],
+                  "observation_ids_sha256": digest(cache["observation_ids"]),
+                  "train_mlflow_run_id": manifest["mlflow_run_id"], "eval_mlflow_run_id": run.info.run_id,
+                  "train_manifest": manifest, "prediction": predicted,
+                  "predictions_uri": f"runs:/{run.info.run_id}/evaluation/assignments.csv"}
+        write_json(directory / "result.json", result)
+        write_json(directory / "metrics.json", {k: v for k, v in metrics.items() if isinstance(v, (int, float)) or v is None})
+        mlflow.log_params({"train_mlflow_run_id": manifest["mlflow_run_id"],
+                           "encoder": manifest["configuration"]["encoder"]["id"],
+                           "method": manifest["configuration"]["method"],
+                           "seed": manifest["configuration"]["hyperparameters"]["random_state"],
+                           **params["evaluation"]})
+        mlflow.log_metrics({k: v for k, v in metrics.items() if isinstance(v, (int, float))})
+        client = mlflow.MlflowClient()
+        for key, value in metrics.items():
+            if isinstance(value, (int, float)):
+                client.log_metric(manifest["mlflow_run_id"], key, value)
+        mlflow.set_tag("silhouette_defined", str(metrics["silhouette_cosine"] is not None).lower())
+        mlflow.log_artifact(str(directory / "result.json"), artifact_path="evaluation")
+        mlflow.log_artifact(predicted["predictions_path"], artifact_path="evaluation")
+    return result
+
 
 if __name__ == "__main__":
-    main(_cli())
+    main()

@@ -1,9 +1,50 @@
-mergeInc:
-  source: "avis_40k"
-  increm: "avis_28k"
-  output: "avis_45k"
-collect:
-  source: "avis_45k"
-  mode: "bulk"            # "incremental" ou "bulk" ou "predict" attention 
-  period_sta: "P202401"   # en incremental : juste les nouveaux sont ajoutés, en predict on batch qu'un petit bout
-  period_end: "P202603"   # en bulk on fait tout
+data:
+  train: data/train_eval/train_20k.csv
+  eval: data/train_eval/eval_4k.csv
+  train_rows: 20000
+  eval_rows: 4000
+  text_column: commentaire
+  id_column: 'Unnamed: 0'
+encoders:
+  mpnet:
+    id: sentence-transformers/paraphrase-multilingual-mpnet-base-v2
+    revision: 4328cf26390c98c5e3c738b4460a05b95f4911f5
+    max_seq_length: 128
+  minilm:
+    id: sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2
+    revision: e8f8c211226b894fcb81acc59f3b34ba3efd5f42
+    max_seq_length: 128
+embedding:
+  batch_size: 16
+  device: cpu
+clustering:
+  n_clusters: 10
+  n_init: 10
+  max_iter: 300
+exploration:
+  methods:
+  - kmeans
+  - spherical_kmeans
+  seeds:
+  - 42
+  - 43
+  - 44
+  - 45
+  - 46
+experiment:
+  encoder: minilm
+  method: spherical_kmeans
+  seed: 46
+tracking:
+  # Local only: credentials are loaded into the environment, never DVC outputs.
+  env_file: .env.dagshub.local
+  # Optional explicit override. Otherwise use the URI from the local env file.
+  uri: ''
+  train_experiment: Supply_chain_train
+  eval_experiment: Supply_chain_eval
+evaluation:
+  sample_size: 0
+  sample_seed: 42
+  working_memory_mb: 32
+selection:
+  final_seed: 42

@@ -1,6 +1,5 @@
 [core]
-    no_scm = True
     remote = origin
-    autostage = true    
 ['remote "origin"']
-    url = https://dagshub.com/schmilblick-ai/Supply-Chain-MLOps.dvc
+    url = s3://dvc
+    endpointurl = https://dagshub.com/mom.robin.63/Supply-Chain-MLOps.s3

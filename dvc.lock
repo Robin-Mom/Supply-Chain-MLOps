@@ -1,203 +1,366 @@
 schema: '2.0'
 stages:
-  preprocess:
-    cmd: python src/preprocess.py
+  train:
+    cmd: python src/train.py --params params.yaml
     deps:
-    - path: data/avis_40k.csv
+    - path: data/train_eval/eval_4k.csv
       hash: md5
-      md5: a37a97783209add4600b46b82faeb88b
-      size: 21331918
-    - path: src/preprocess.py
+      md5: 2b0ef78040482e686d4825d67bb26125
+      size: 1912351
+    - path: data/train_eval/train_20k.csv
       hash: md5
-      md5: 51b052a672793a305255db9fe1be80dd
-      size: 2221
-    outs:
-    - path: data/avis_cleaned.csv
+      md5: b070b7cac27a5306a3e3c090bd7f91eb
+      size: 8142980
+    - path: models/embeddings/minilm/train.json
       hash: md5
-      md5: f0ebb653f6335b8657c61547c1b23572
-      size: 20623543
-  nlp_simple:
-    cmd: python src/preprocess_nlp.py
-    deps:
-    - path: data/avis_cleaned.csv
+      md5: 4b34fd651fddd09556bc7bd531f02e99
+      size: 249651
+    - path: models/embeddings/minilm/train.npy
       hash: md5
-      md5: f0ebb653f6335b8657c61547c1b23572
-      size: 20623543
-    - path: src/preprocess_nlp.py
+      md5: 8746aecaaa4d643cb2a02c90573abe0a
+      size: 30720128
+    - path: pyproject.toml
       hash: md5
-      md5: ec367b95f91f02891a928bfd6ffee280
-      size: 2316
-    outs:
-    - path: data/avis_nlp.csv
+      md5: 3f26c79715a88c82a1d4aba26128d86c
+      size: 621
+    - path: src/embed.py
       hash: md5
-      md5: b36b8de537328709b48a33a2ef242bab
-      size: 24081047
-  spacy_lemmatization:
-    cmd: python src/preprocess_spacy.py
-    deps:
-    - path: data/avis_cleaned.csv
-      hash: md5
-      md5: f0ebb653f6335b8657c61547c1b23572
-      size: 20623543
-    - path: src/preprocess_spacy.py
-      hash: md5
-      md5: 56641a07add67062972024e7483e6325
-      size: 2321
-    outs:
-    - path: data/avis_bertopic.csv
-      hash: md5
-      md5: 004c6d552a699965607d010e4722e0c2
-      size: 24591821
-  train@c5:
-    cmd: python src/train.py -v -nc 5 -o models/c5
-    deps:
-    - path: data/avis_bertopic.csv
-      hash: md5
-      md5: 004c6d552a699965607d010e4722e0c2
-      size: 24591821
-    - path: src/train.py
-      hash: md5
-      md5: 29a23adcd2103f38acf35dd40274116e
-      size: 6839
-    outs:
-    - path: models/c5/artifacts
-      hash: md5
-      md5: 5c0e76a42e7185ec46ae260dceced402.dir
-      size: 298520179
-      nfiles: 9
-    - path: models/c5/last_run_id.txt
-      hash: md5
-      md5: f5f78cf96045d9b8c0cf8bf3e3371919
-      size: 32
-  train@c10:
-    cmd: python src/train.py -v -nc 10 -o models/c10
-    deps:
-    - path: data/avis_bertopic.csv
-      hash: md5
-      md5: 004c6d552a699965607d010e4722e0c2
-      size: 24591821
-    - path: src/train.py
-      hash: md5
-      md5: 29a23adcd2103f38acf35dd40274116e
-      size: 6839
-    outs:
-    - path: models/c10/artifacts
-      hash: md5
-      md5: 5bfffbf2be4f20387f4921811c02642b.dir
-      size: 298465434
-      nfiles: 9
-    - path: models/c10/last_run_id.txt
-      hash: md5
-      md5: f5f78cf96045d9b8c0cf8bf3e3371919
-      size: 32
-  train@c15:
-    cmd: python src/train.py -v -nc 15 -o models/c15
-    deps:
-    - path: data/avis_bertopic.csv
-      hash: md5
-      md5: 004c6d552a699965607d010e4722e0c2
-      size: 24591821
-    - path: src/train.py
-      hash: md5
-      md5: 29a23adcd2103f38acf35dd40274116e
-      size: 6839
-    outs:
-    - path: models/c15/artifacts
-      hash: md5
-      md5: 3ab5c7f16a337fa9a2480925b8607837.dir
-      size: 298565332
-      nfiles: 9
-    - path: models/c15/last_run_id.txt
-      hash: md5
-      md5: f5f78cf96045d9b8c0cf8bf3e3371919
-      size: 32
-  evaluate@c5:
-    cmd: python src/evaluate.py -v -f models/c5/artifacts/clusterized.csv -ri 
-      models/c5/last_run_id.txt -ap models/c5/artifacts -mo 
-      metrics/c5/silhouette.json
-    deps:
-    - path: models/c5/artifacts/clusterized.csv
-      hash: md5
-      md5: d9c61dd879c91fdb643310a010dee734
-      size: 235876305
-    - path: models/c5/last_run_id.txt
-      hash: md5
-      md5: f5f78cf96045d9b8c0cf8bf3e3371919
-      size: 32
+      md5: b59dc05a33727aee57863df576640492
+      size: 3096
     - path: src/evaluate.py
       hash: md5
-      md5: f49996fdae6f5d4e566b9f33404321ae
-      size: 5163
+      md5: 09722a280e3b45c11368cc378c99ceab
+      size: 18987
+    - path: src/experiment.py
+      hash: md5
+      md5: 7a573a85c0d66be2d8aeda0a06737c38
+      size: 9332
+    - path: src/predict.py
+      hash: md5
+      md5: ccfd2142b2ee0f129c71a0cc223bc029
+      size: 7927
+    - path: src/tracking.py
+      hash: md5
+      md5: 54bc5644a5b0be78ff6f2439c01b9086
+      size: 4455
+    - path: src/train.py
+      hash: md5
+      md5: b4cd88fa5c4f640fde75e489234c28a8
+      size: 15161
+    - path: uv.lock
+      hash: md5
+      md5: a34dcaa07fdd2dd91ed77eb2be658d68
+      size: 1112044
+    params:
+      params.yaml:
+        clustering:
+          n_clusters: 10
+          n_init: 10
+          max_iter: 300
+        data:
+          train: data/train_eval/train_20k.csv
+          eval: data/train_eval/eval_4k.csv
+          train_rows: 20000
+          eval_rows: 4000
+          text_column: commentaire
+          id_column: 'Unnamed: 0'
+        encoders:
+          mpnet:
+            id: sentence-transformers/paraphrase-multilingual-mpnet-base-v2
+            revision: 4328cf26390c98c5e3c738b4460a05b95f4911f5
+            max_seq_length: 128
+          minilm:
+            id: sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2
+            revision: e8f8c211226b894fcb81acc59f3b34ba3efd5f42
+            max_seq_length: 128
+        evaluation:
+          sample_size: 0
+          sample_seed: 42
+          working_memory_mb: 32
+        experiment:
+          encoder: minilm
+          method: spherical_kmeans
+          seed: 46
+        exploration:
+          methods:
+          - kmeans
+          - spherical_kmeans
+          seeds:
+          - 42
+          - 43
+          - 44
+          - 45
+          - 46
+        selection:
+          final_seed: 42
+        tracking:
+          env_file: .env.dagshub.local
+          uri: ''
+          train_experiment: Supply_chain_train
+          eval_experiment: Supply_chain_eval
     outs:
-    - path: metrics/c5/silhouette.json
+    - path: models/runs/minilm/spherical_kmeans/46
       hash: md5
-      md5: 6fedd64d9958acdc62341ae5ba958c6e
-      size: 47
-  evaluate@c10:
-    cmd: python src/evaluate.py -v -f models/c10/artifacts/clusterized.csv -ri 
-      models/c10/last_run_id.txt -ap models/c10/artifacts -mo 
-      metrics/c10/silhouette.json
+      md5: 4c78626305a272c21c6115203040c22c.dir
+      size: 17962
+      nfiles: 3
+  evaluate:
+    cmd: python src/evaluate.py --params params.yaml
     deps:
-    - path: models/c10/artifacts/clusterized.csv
+    - path: data/train_eval/eval_4k.csv
       hash: md5
-      md5: b6e3e30b575fc53132cb227e80c103ff
-      size: 235824481
-    - path: models/c10/last_run_id.txt
+      md5: 2b0ef78040482e686d4825d67bb26125
+      size: 1912351
+    - path: models/embeddings/minilm/eval.json
       hash: md5
-      md5: f5f78cf96045d9b8c0cf8bf3e3371919
-      size: 32
+      md5: 09e95973188a7a03119564410c14305b
+      size: 52759
+    - path: models/embeddings/minilm/eval.npy
+      hash: md5
+      md5: f59be91ecb41a238978a9561f5be18bc
+      size: 6144128
+    - path: models/predictions/minilm/spherical_kmeans/46
+      hash: md5
+      md5: 349caa93489d7b78c4ea54e41d5ca399.dir
+      size: 292641
+      nfiles: 2
+    - path: models/runs/minilm/spherical_kmeans/46
+      hash: md5
+      md5: 4c78626305a272c21c6115203040c22c.dir
+      size: 17962
+      nfiles: 3
+    - path: pyproject.toml
+      hash: md5
+      md5: 3f26c79715a88c82a1d4aba26128d86c
+      size: 621
     - path: src/evaluate.py
       hash: md5
-      md5: f49996fdae6f5d4e566b9f33404321ae
-      size: 5163
-    outs:
-    - path: metrics/c10/silhouette.json
+      md5: 09722a280e3b45c11368cc378c99ceab
+      size: 18987
+    - path: src/experiment.py
       hash: md5
-      md5: 86a3fbc99cfd794eb8d2d91de5d1d15b
-      size: 48
-  evaluate@c15:
-    cmd: python src/evaluate.py -v -f models/c15/artifacts/clusterized.csv -ri 
-      models/c15/last_run_id.txt -ap models/c15/artifacts -mo 
-      metrics/c15/silhouette.json
+      md5: 7a573a85c0d66be2d8aeda0a06737c38
+      size: 9332
+    - path: src/tracking.py
+      hash: md5
+      md5: 54bc5644a5b0be78ff6f2439c01b9086
+      size: 4455
+    - path: src/train.py
+      hash: md5
+      md5: b4cd88fa5c4f640fde75e489234c28a8
+      size: 15161
+    - path: uv.lock
+      hash: md5
+      md5: a34dcaa07fdd2dd91ed77eb2be658d68
+      size: 1112044
+    params:
+      params.yaml:
+        clustering:
+          n_clusters: 10
+          n_init: 10
+          max_iter: 300
+        data:
+          train: data/train_eval/train_20k.csv
+          eval: data/train_eval/eval_4k.csv
+          train_rows: 20000
+          eval_rows: 4000
+          text_column: commentaire
+          id_column: 'Unnamed: 0'
+        encoders.minilm:
+          id: sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2
+          revision: e8f8c211226b894fcb81acc59f3b34ba3efd5f42
+          max_seq_length: 128
+        evaluation:
+          sample_size: 0
+          sample_seed: 42
+          working_memory_mb: 32
+        experiment:
+          encoder: minilm
+          method: spherical_kmeans
+          seed: 46
+        exploration:
+          methods:
+          - kmeans
+          - spherical_kmeans
+          seeds:
+          - 42
+          - 43
+          - 44
+          - 45
+          - 46
+        selection:
+          final_seed: 42
+        tracking:
+          env_file: .env.dagshub.local
+          uri: ''
+          train_experiment: Supply_chain_train
+          eval_experiment: Supply_chain_eval
+    outs:
+    - path: models/evaluations/minilm/spherical_kmeans/46/metrics.json
+      hash: md5
+      md5: 625d5b1fe9c5921054612ab6e8cefafc
+      size: 135
+    - path: models/evaluations/minilm/spherical_kmeans/46/result.json
+      hash: md5
+      md5: ccb871ffafc8b0cab13f475f6c53d70e
+      size: 4017
+  select:
+    cmd: python src/select_model.py --metrics metrics/clustering.json 
+      --artifact-dir models/clustering --output reports/selection.json --metric 
+      silhouette_cosine --direction maximize
     deps:
-    - path: models/c15/artifacts/clusterized.csv
+    - path: metrics/clustering.json
       hash: md5
-      md5: 8860cf9c727051b77cf2ac2395fa02ab
-      size: 235866903
-    - path: models/c15/last_run_id.txt
+      md5: db3feb4a841648dc569cf80bbb44e283
+      size: 560
+    - path: models/clustering
       hash: md5
-      md5: f5f78cf96045d9b8c0cf8bf3e3371919
-      size: 32
-    - path: src/evaluate.py
+      md5: bfe6d3090cff5f088461caf5d707fd7c.dir
+      size: 1280515783
+      nfiles: 20
+    - path: pyproject.toml
       hash: md5
-      md5: f49996fdae6f5d4e566b9f33404321ae
-      size: 5163
+      md5: 07ef3327d18d9f5853605bac05ca3015
+      size: 595
+    - path: src/select_model.py
+      hash: md5
+      md5: 879ee29ab45da13089cbf95d7020c6e9
+      size: 3259
+    - path: src/tracking.py
+      hash: md5
+      md5: 14e2b14ed6b9b48d49d8556d7be3d408
+      size: 2054
+    - path: src/train.py
+      hash: md5
+      md5: 41272052e421efb565915ce721f5fdde
+      size: 12287
+    - path: uv.lock
+      hash: md5
+      md5: d8c0d7574f27a8d719b365928123072c
+      size: 1111959
+    params:
+      params.yaml:
+        selection:
+          metric: silhouette_cosine
+          direction: maximize
     outs:
-    - path: metrics/c15/silhouette.json
+    - path: reports/selection.json
       hash: md5
-      md5: 164a271488e1a2b8e5e6fdc49fe3677f
-      size: 47
-  mergInc:
-    cmd: python -c "from src.collect import merge_avis; merge_avis()"
+      md5: 38d069681d9a0eaa5bc7f3f8723e8d60
+      size: 792
+  embed@minilm:
+    cmd: python src/embed.py --params params.yaml --encoder minilm
     deps:
-    - path: data/avis_28k.csv
+    - path: data/train_eval/eval_4k.csv
       hash: md5
-      md5: 91468bdcba366b4574ec554396cfb301
-      size: 16240466
-    - path: data/avis_40k.csv
+      md5: 2b0ef78040482e686d4825d67bb26125
+      size: 1912351
+    - path: data/train_eval/train_20k.csv
       hash: md5
-      md5: a37a97783209add4600b46b82faeb88b
-      size: 21331918
-    - path: params.yaml
+      md5: b070b7cac27a5306a3e3c090bd7f91eb
+      size: 8142980
+    - path: pyproject.toml
       hash: md5
-      md5: 6a13b68380507857c6c2243267eb7fcb
-      size: 344
-    - path: src/collect.py
+      md5: 3f26c79715a88c82a1d4aba26128d86c
+      size: 621
+    - path: src/embed.py
       hash: md5
-      md5: e5466e051aec926356e227676cf83e55
-      size: 36411
+      md5: b59dc05a33727aee57863df576640492
+      size: 3096
+    - path: src/experiment.py
+      hash: md5
+      md5: 7a573a85c0d66be2d8aeda0a06737c38
+      size: 9332
+    - path: uv.lock
+      hash: md5
+      md5: a34dcaa07fdd2dd91ed77eb2be658d68
+      size: 1112044
+    params:
+      params.yaml:
+        data:
+          train: data/train_eval/train_20k.csv
+          eval: data/train_eval/eval_4k.csv
+          train_rows: 20000
+          eval_rows: 4000
+          text_column: commentaire
+          id_column: 'Unnamed: 0'
+        embedding:
+          batch_size: 16
+          device: cpu
+        encoders.minilm:
+          id: sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2
+          revision: e8f8c211226b894fcb81acc59f3b34ba3efd5f42
+          max_seq_length: 128
     outs:
-    - path: data/avis_45k.csv
+    - path: models/embeddings/minilm
       hash: md5
-      md5: b6cc45941923d649252e393343cb2ff0
-      size: 21698577
+      md5: 240aebcf7790b037805c945f766235b5.dir
+      size: 37166666
+      nfiles: 4
+  predict:
+    cmd: python src/predict.py --params params.yaml
+    deps:
+    - path: data/train_eval/eval_4k.csv
+      hash: md5
+      md5: 2b0ef78040482e686d4825d67bb26125
+      size: 1912351
+    - path: models/embeddings/minilm/eval.json
+      hash: md5
+      md5: 09e95973188a7a03119564410c14305b
+      size: 52759
+    - path: models/embeddings/minilm/eval.npy
+      hash: md5
+      md5: f59be91ecb41a238978a9561f5be18bc
+      size: 6144128
+    - path: models/runs/minilm/spherical_kmeans/46
+      hash: md5
+      md5: 4c78626305a272c21c6115203040c22c.dir
+      size: 17962
+      nfiles: 3
+    - path: pyproject.toml
+      hash: md5
+      md5: 3f26c79715a88c82a1d4aba26128d86c
+      size: 621
+    - path: src/experiment.py
+      hash: md5
+      md5: 7a573a85c0d66be2d8aeda0a06737c38
+      size: 9332
+    - path: src/predict.py
+      hash: md5
+      md5: ccfd2142b2ee0f129c71a0cc223bc029
+      size: 7927
+    - path: src/train.py
+      hash: md5
+      md5: b4cd88fa5c4f640fde75e489234c28a8
+      size: 15161
+    - path: uv.lock
+      hash: md5
+      md5: a34dcaa07fdd2dd91ed77eb2be658d68
+      size: 1112044
+    params:
+      params.yaml:
+        clustering:
+          n_clusters: 10
+          n_init: 10
+          max_iter: 300
+        data:
+          train: data/train_eval/train_20k.csv
+          eval: data/train_eval/eval_4k.csv
+          train_rows: 20000
+          eval_rows: 4000
+          text_column: commentaire
+          id_column: 'Unnamed: 0'
+        encoders.minilm:
+          id: sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2
+          revision: e8f8c211226b894fcb81acc59f3b34ba3efd5f42
+          max_seq_length: 128
+        experiment:
+          encoder: minilm
+          method: spherical_kmeans
+          seed: 46
+    outs:
+    - path: models/predictions/minilm/spherical_kmeans/46
+      hash: md5
+      md5: 349caa93489d7b78c4ea54e41d5ca399.dir
+      size: 292641
+      nfiles: 2

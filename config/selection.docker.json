@@ -1,0 +1,31 @@
+{
+  "tracking_uri": "https://dagshub.com/mom.robin.63/Supply-Chain-MLOps.mlflow",
+  "train_mlflow_run_id": "c650a6675bf5438c81d90b96ee4e154c",
+  "manifest_uri": "runs:/c650a6675bf5438c81d90b96ee4e154c/clustering/manifest.json",
+  "model_uri": "runs:/c650a6675bf5438c81d90b96ee4e154c/clustering/model.joblib",
+  "model_sha256": "0576bf251a3b4daad93598bc971669d32b18e71d9fd5a9b1b98034486ca3f4af",
+  "logical_id": "c93cb37fac6cbebb9f3cce20cb962722c0190a5e588afffbb80f6512eebafab0",
+  "configuration": {
+    "encoder_alias": "mpnet",
+    "encoder": {
+      "id": "sentence-transformers/paraphrase-multilingual-mpnet-base-v2",
+      "revision": "4328cf26390c98c5e3c738b4460a05b95f4911f5",
+      "max_seq_length": 128
+    },
+    "method": "spherical_kmeans",
+    "hyperparameters": {
+      "n_clusters": 10,
+      "n_init": 10,
+      "max_iter": 300,
+      "random_state": 42
+    },
+    "preprocessing": {
+      "version": 1,
+      "text": "fillna-empty/str/strip/reject-empty",
+      "normalize": "l2",
+      "dtype": "float32"
+    },
+    "train_cache_id": "cc49fd55af3f3ad7336364c995197d1962ea24a3a27ce5af8eefa1b42278e233"
+  },
+  "final_seed": 42
+}

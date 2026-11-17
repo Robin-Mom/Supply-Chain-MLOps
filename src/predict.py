@@ -1,125 +1,165 @@
-#!/usr/bin/env python3
-# -*- coding: utf-8 -*-
+"""Assign new reviews to an existing KMeans or Spherical KMeans model.
+
+No estimator is fitted in this module.
+"""
+from __future__ import annotations
 
 import argparse
-import json
-import logging as log
-import os
+from pathlib import Path
+
 import joblib
-import dagshub
-import mlflow
+import numpy as np
 
-from sentence_transformers import SentenceTransformer
-from mlflow.tracking import MlflowClient
+from train import METHODS, load_reviews, validate_embeddings
 
 
-def load_production_model(model_name):
-
-    client = MlflowClient()
-
-    versions = client.get_latest_versions(
-        model_name,
-        stages=["Production"]
-    )
-
-    if len(versions) == 0:
-        raise ValueError(
-            f"No Production model found for {model_name}"
-        )
-
-    model_uri = versions[0].source
-
-    local_path = mlflow.artifacts.download_artifacts(
-        artifact_uri=model_uri
-    )
-
-    return local_path
+def load_bundle(artifact_dir, method):
+    """Load a trusted local bundle; never load untrusted joblib files."""
+    if method not in METHODS:
+        raise ValueError(f"Unsupported method: {method}. Choose from {METHODS}.")
+    bundle = joblib.load(Path(artifact_dir) / method / "model.joblib")
+    if bundle["method"] != method:
+        raise ValueError("The model bundle does not match the requested method.")
+    return bundle
 
 
-def predict(text, model_name):
-
-    dagshub.init(
-        repo_owner='schmilblick-ai',
-        repo_name='Supply-Chain-MLOps',
-        mlflow=True
-    )
-
-    model_path = load_production_model(model_name)
-
-    with open(
-        os.path.join(model_path, "config.json"),
-        "r"
-    ) as f:
-        config = json.load(f)
-
-    st_model_name = config["sentence_transformer"]
-
-    kmeans = joblib.load(
-        os.path.join(model_path, "kmeans.pkl")
-    )
-
-    meta_labels = joblib.load(
-        os.path.join(model_path, "meta_labels.pkl")
-    )
-
-    embedding_model = SentenceTransformer(
-        st_model_name, device='cpu'
-    )
-
-    embedding = embedding_model.encode([text])
-
-    meta_topic = kmeans.predict(embedding)[0]
-
-    if meta_topic in meta_labels:
-        label = " | ".join(meta_labels[meta_topic])
-    else:
-        label = "unknown"
-
-    return {
-        "text": text,
-        "meta_topic": int(meta_topic),
-        "meta_label": label
-    }
+def predict_embeddings(bundle, embeddings):
+    """Predict labels in the same normalized space used during training."""
+    if bundle["method"] not in METHODS:
+        raise ValueError(f"Unsupported method: {bundle['method']}")
+    X = validate_embeddings(embeddings)
+    if X.shape[1] != bundle["n_features"]:
+        raise ValueError("Embedding dimensions do not match the trained model.")
+    return np.asarray(bundle["model"].predict(X))
 
 
-def _cli():
+def predict_reviews(artifact_dir, method, texts, device=None, batch_size=32):
+    """Reload the saved encoder and model, then return labels and embeddings."""
+    bundle = load_bundle(artifact_dir, method)
+    from sentence_transformers import SentenceTransformer
+    encoder = SentenceTransformer(str(Path(artifact_dir) / "encoder"), device=device,
+                                  local_files_only=True, trust_remote_code=False,
+                                  model_kwargs={"use_safetensors": True})
+    X = validate_embeddings(encoder.encode(list(texts), batch_size=batch_size,
+                                          normalize_embeddings=True, show_progress_bar=True))
+    return predict_embeddings(bundle, X), X
 
-    parser = argparse.ArgumentParser()
 
-    parser.add_argument(
-        "-t",
-        "--text",
-        required=True
-    )
+def main(argv=None):
+    """Write the input columns plus cluster_id, preserving input row order."""
+    import sys
+    arguments = list(sys.argv[1:] if argv is None else argv)
+    if "--params" in arguments:
+        from experiment import load_params
+        parser = argparse.ArgumentParser()
+        parser.add_argument("--params", required=True)
+        return predict_experiment(load_params(parser.parse_args(arguments).params))
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("--input", type=Path, required=True)
+    parser.add_argument("--output", type=Path, required=True)
+    parser.add_argument("--artifact-dir", type=Path, required=True)
+    parser.add_argument("--method", choices=METHODS, required=True)
+    parser.add_argument("--text-column", default="commentaire")
+    parser.add_argument("--device")
+    parser.add_argument("--batch-size", type=int, default=32)
+    args = parser.parse_args(argv)
+    if args.output.exists():
+        parser.error("Output file already exists; choose a new path.")
+    if args.batch_size < 1:
+        parser.error("batch-size must be positive.")
+    df, texts = load_reviews(args.input, args.text_column)
+    if "cluster_id" in df:
+        parser.error("Input already contains cluster_id; rename that column first.")
+    labels, _ = predict_reviews(args.artifact_dir, args.method, texts, args.device, args.batch_size)
+    df["cluster_id"] = labels
+    args.output.parent.mkdir(parents=True, exist_ok=True)
+    df.to_csv(args.output, index=False)
+    print(f"Saved {len(df)} predictions to {args.output}")
 
-    parser.add_argument(
-        "-mn",
-        "--model_name",
-        default="trustpilot_bertopic_v4"
-    )
 
-    parser.add_argument(
-        "-v",
-        "--verbose",
-        action="store_true"
-    )
+class ExperimentPredictor:
+    """Reusable frozen inference service for trusted experiment bundles."""
+    def __init__(self, manifest):
+        from experiment import file_hash
+        self.manifest = manifest
+        if file_hash(manifest["model_path"]) != manifest["model_sha256"]:
+            raise ValueError("Model checksum mismatch.")
+        if manifest["transformations"]:
+            raise ValueError("Unsupported transformations; no fitting is permitted during inference.")
+        self.bundle = joblib.load(manifest["model_path"])
+        config = manifest["configuration"]
+        if (self.bundle["logical_id"] != manifest["logical_id"] or self.bundle["encoder"] != config["encoder"]
+                or self.bundle["preprocessing"] != config["preprocessing"]
+                or self.bundle["method"] != config["method"]):
+            raise ValueError("Bundle and manifest configurations differ.")
+        self.encoder = None
 
-    args = parser.parse_args()
+    def predict_cached(self, embeddings):
+        return predict_embeddings(self.bundle, embeddings)
 
-    if args.verbose:
-        log.basicConfig(level=log.INFO)
+    @classmethod
+    def from_mlflow(cls, manifest_uri, destination):
+        """Materialize only the selected clustering bundle for future API use.
 
-    return vars(args)
+        Configure MLflow tracking first; the transformer remains in the HF cache.
+        """
+        import mlflow
+        from experiment import read_json
+        from tracking import configure_tracking
+        configure_tracking(mlflow.get_tracking_uri())
+        destination = Path(destination)
+        destination.mkdir(parents=True, exist_ok=True)
+        local_manifest = mlflow.artifacts.download_artifacts(artifact_uri=manifest_uri, dst_path=str(destination))
+        manifest = read_json(local_manifest)
+        manifest["model_path"] = mlflow.artifacts.download_artifacts(
+            artifact_uri=manifest["model_uri"], dst_path=str(destination))
+        return cls(manifest)
+
+    def predict_texts(self, texts, batch_size=32, device=None, *, return_embeddings=False):
+        """Load the pinned encoder lazily and reuse it across API requests."""
+        from sentence_transformers import SentenceTransformer
+        from experiment import PREPROCESSING
+        if self.manifest["configuration"]["preprocessing"] != PREPROCESSING:
+            raise ValueError("Unsupported preprocessing version.")
+        cleaned = [str(text).strip() if text is not None else "" for text in texts]
+        if not cleaned or any(not text for text in cleaned) or batch_size < 1:
+            raise ValueError("Provide nonblank texts and a positive batch size.")
+        if self.encoder is None:
+            spec = self.manifest["configuration"]["encoder"]
+            self.encoder = SentenceTransformer(spec["id"], revision=spec["revision"], device=device,
+                                              trust_remote_code=False, model_kwargs={"use_safetensors": True})
+            self.encoder.max_seq_length = spec["max_seq_length"]
+        labels, blocks = [], []
+        for start in range(0, len(cleaned), batch_size):
+            block = self.encoder.encode(cleaned[start:start + batch_size], batch_size=batch_size,
+                                        normalize_embeddings=True, convert_to_numpy=True)
+            labels.append(self.predict_cached(block))
+            if return_embeddings:
+                blocks.append(validate_embeddings(block))
+        predictions = np.concatenate(labels)
+        return (predictions, np.concatenate(blocks)) if return_embeddings else predictions
+
+
+def predict_experiment(params):
+    import pandas as pd
+    from experiment import (checked_manifest, digest, file_hash, load_embeddings, prediction_dir, write_json)
+    manifest = checked_manifest(params)
+    X, cache = load_embeddings(params, params["experiment"]["encoder"], "eval")
+    if X.shape[1] != manifest["n_features"]:
+        raise ValueError("Train/eval dimensions differ.")
+    labels = ExperimentPredictor(manifest).predict_cached(X)
+    directory = prediction_dir(params)
+    directory.mkdir(parents=True, exist_ok=False)
+    path = directory / "assignments.csv"
+    pd.DataFrame({"observation_id": cache["observation_ids"], "logical_id": manifest["logical_id"],
+                  "cluster_id": labels}).to_csv(path, index=False)
+    info = {"logical_id": manifest["logical_id"], "train_mlflow_run_id": manifest["mlflow_run_id"],
+            "eval_cache_id": cache["cache_id"], "eval_embedding_sha256": cache["sha256"],
+            "predictions_path": str(path), "predictions_sha256": file_hash(path),
+            "observation_ids_sha256": digest(cache["observation_ids"])}
+    write_json(directory / "manifest.json", info)
+    return info
 
 
 if __name__ == "__main__":
-
-    args = _cli()
-
-    result = predict(
-        args["text"],
-        args["model_name"]
-    )
-
-    print(result)
-
+    main()
